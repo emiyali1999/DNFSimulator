@@ -1,3 +1,5 @@
+import UnitStateMachine from "./UnitStateMachine";
+
 const {ccclass, property} = cc._decorator;
 
 @ccclass
@@ -6,6 +8,9 @@ export default class PlayerController extends cc.Component {
     /** 移动速度（像素/秒） */
     @property
     moveSpeed: number = 300;
+
+    @property(UnitStateMachine)
+    stateMachine: UnitStateMachine = null;
 
     private _moveDir: cc.Vec2 = cc.v2(0, 0);
 
@@ -36,6 +41,11 @@ export default class PlayerController extends cc.Component {
             case cc.macro.KEY.right:
             case cc.macro.KEY.d:
                 this._moveDir.x = 1;
+                break;
+            case cc.macro.KEY.x:
+                if (this.stateMachine) {
+                    this.stateMachine.changeState("SwordMan_Attack01");
+                }
                 break;
         }
     }

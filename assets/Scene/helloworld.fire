@@ -17,7 +17,7 @@
         "__id__": 2
       }
     ],
-    "_active": true,
+    "_active": false,
     "_components": [],
     "_prefab": null,
     "_opacity": 255,
@@ -81,13 +81,13 @@
     "_active": true,
     "_components": [
       {
-        "__id__": 11
-      },
-      {
         "__id__": 12
       },
       {
         "__id__": 13
+      },
+      {
+        "__id__": 14
       }
     ],
     "_prefab": null,
@@ -375,6 +375,9 @@
       },
       {
         "__id__": 10
+      },
+      {
+        "__id__": 11
       }
     ],
     "_prefab": null,
@@ -388,13 +391,13 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 50,
-      "height": 50
+      "width": 120,
+      "height": 120
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
-      "x": 0.5,
-      "y": 0.5
+      "x": 0,
+      "y": 1
     },
     "_trs": {
       "__type__": "TypedArray",
@@ -426,36 +429,34 @@
     "_id": "70ehDKtQpD26C0b9tCnYBW"
   },
   {
-    "__type__": "cc.Sprite",
+    "__type__": "008342GhVhEz6wvqN4YVQyN",
     "_name": "",
     "_objFlags": 0,
     "node": {
       "__id__": 8
     },
     "_enabled": true,
-    "_materials": [
-      {
-        "__uuid__": "eca5d2f2-8ef6-41c2-bbe6-f9c79d09c432"
-      }
-    ],
-    "_srcBlendFactor": 770,
-    "_dstBlendFactor": 771,
-    "_spriteFrame": {
-      "__uuid__": "31bc895a-c003-4566-a9f3-2e54ae1c17dc"
-    },
-    "_type": 0,
-    "_sizeMode": 0,
-    "_fillType": 0,
-    "_fillCenter": {
+    "globalOffset": {
       "__type__": "cc.Vec2",
-      "x": 0,
-      "y": 0
+      "x": -218,
+      "y": -280
     },
-    "_fillStart": 0,
-    "_fillRange": 0,
-    "_isTrimmedMode": true,
-    "_atlas": null,
-    "_id": "e9KFjAyxVJAZdAJlxbfO4F"
+    "_id": "c8r7ci7cxIUrCdpsmXaXWz"
+  },
+  {
+    "__type__": "377dau2I9ZE5JSHsGkEgdvV",
+    "_name": "",
+    "_objFlags": 0,
+    "node": {
+      "__id__": 8
+    },
+    "_enabled": true,
+    "animPlayer": {
+      "__id__": 9
+    },
+    "statesFolder": "AnimState/Character/SwordMan",
+    "defaultState": "SwordMan_Attack01",
+    "_id": "c3/SE+dBJLaaNp11MCfSHS"
   },
   {
     "__type__": "b9fefMXiPJFP6iH+Ri4FLGx",
@@ -466,7 +467,10 @@
     },
     "_enabled": true,
     "moveSpeed": 300,
-    "_id": "f7IO9ywnNJY69J9RVeiQaB"
+    "stateMachine": {
+      "__id__": 10
+    },
+    "_id": "baMsjvuH9M8r2Vapm2cSKK"
   },
   {
     "__type__": "cc.Canvas",
