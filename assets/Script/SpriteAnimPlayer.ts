@@ -38,6 +38,9 @@ export default class SpriteAnimPlayer extends cc.Component {
         this._applyFrame(0);
     }
 
+    get currentFrameIndex(): number { return this._frameIndex; }
+    get currentStateName(): string { return this._currentState ? this._currentState.stateName : ""; }
+
     stop() {
         this._playing = false;
         this._paused = false;
