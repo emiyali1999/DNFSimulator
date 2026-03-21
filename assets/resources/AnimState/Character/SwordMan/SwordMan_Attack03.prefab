@@ -13,7 +13,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "SwordMan_Attack01",
+    "_name": "SwordMan_Attack03",
     "_objFlags": 0,
     "_parent": null,
     "_children": [],
@@ -81,7 +81,7 @@
       "__id__": 1
     },
     "_enabled": true,
-    "stateName": "SwordMan_Attack01",
+    "stateName": "SwordMan_Attack03",
     "frames": [
       {
         "__id__": 3
@@ -112,78 +112,78 @@
   {
     "__type__": "FrameData",
     "spriteFrame": {
-      "__uuid__": "0c2d5f40-f7cb-4f86-99a5-a319a7c71bb9"
+      "__uuid__": "eeff731c-3aa6-4b07-8b77-bf35146bbde6"
     },
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 154,
-      "y": 219
+      "x": 118,
+      "y": 239
     }
   },
   {
     "__type__": "FrameData",
     "spriteFrame": {
-      "__uuid__": "28e20015-e878-46e6-b316-4d1cadb7e27a"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 156,
-      "y": 219
-    }
-  },
-  {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "4a31eb3b-9668-48fe-811a-6b0531ab8bdb"
+      "__uuid__": "501d815a-618c-4b36-a654-02c87fff57de"
     },
     "offset": {
       "__type__": "cc.Vec2",
       "x": 147,
-      "y": 219
+      "y": 252
     }
   },
   {
     "__type__": "FrameData",
     "spriteFrame": {
-      "__uuid__": "cd86cefa-a459-4d7c-af9f-886099c46345"
+      "__uuid__": "0ea877e9-a97c-4617-8abe-65119e79deef"
     },
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 184,
-      "y": 226
+      "x": 252,
+      "y": 248
     }
   },
   {
     "__type__": "FrameData",
     "spriteFrame": {
-      "__uuid__": "87ca17a4-69fb-41e7-8c7e-18c60b7fc9d2"
+      "__uuid__": "f3cd76dc-f507-45ca-9511-f1f09fd66138"
     },
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 188,
-      "y": 234
+      "x": 250,
+      "y": 202
     }
   },
   {
     "__type__": "FrameData",
     "spriteFrame": {
-      "__uuid__": "d47229b9-43f8-44c6-9ead-e3c2fdc76b6a"
+      "__uuid__": "1cbf99f9-03d7-485e-9125-2e528577dedd"
     },
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 236
+      "x": 251,
+      "y": 153
     }
   },
   {
     "__type__": "FrameData",
     "spriteFrame": {
-      "__uuid__": "dd4d1f3f-7255-42bd-a9f1-23eb9ae3af49"
+      "__uuid__": "84cc3b2c-fcc7-46d9-9b56-0ec56ace53c2"
     },
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 237
+      "x": 255,
+      "y": 132
+    }
+  },
+  {
+    "__type__": "FrameData",
+    "spriteFrame": {
+      "__uuid__": "f755c68d-3f27-4076-8109-847590ffad04"
+    },
+    "offset": {
+      "__type__": "cc.Vec2",
+      "x": 257,
+      "y": 132
     }
   },
   {

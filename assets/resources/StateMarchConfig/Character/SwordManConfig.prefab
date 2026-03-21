@@ -13,7 +13,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "SwordMan_Attack01",
+    "_name": "SwordManConfig",
     "_objFlags": 0,
     "_parent": null,
     "_children": [],
@@ -24,7 +24,7 @@
       }
     ],
     "_prefab": {
-      "__id__": 10
+      "__id__": 11
     },
     "_opacity": 255,
     "_color": {
@@ -41,8 +41,8 @@
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
-      "x": 0,
-      "y": 1
+      "x": 0.5,
+      "y": 0.5
     },
     "_trs": {
       "__type__": "TypedArray",
@@ -74,15 +74,16 @@
     "_id": ""
   },
   {
-    "__type__": "59400JU4PpCyo2ECA17H40B",
+    "__type__": "eef9fZ0I2hFJaUu2IUeOn4j",
     "_name": "",
     "_objFlags": 0,
     "node": {
       "__id__": 1
     },
     "_enabled": true,
-    "stateName": "SwordMan_Attack01",
-    "frames": [
+    "defaultState": "SwordMan_Attack01",
+    "animStatesFolder": "AnimState/Character/SwordMan",
+    "states": [
       {
         "__id__": 3
       },
@@ -91,7 +92,9 @@
       },
       {
         "__id__": 5
-      },
+      }
+    ],
+    "transitions": [
       {
         "__id__": 6
       },
@@ -103,88 +106,75 @@
       },
       {
         "__id__": 9
+      },
+      {
+        "__id__": 10
       }
     ],
-    "fps": 10,
-    "loop": false,
     "_id": ""
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "0c2d5f40-f7cb-4f86-99a5-a319a7c71bb9"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 154,
-      "y": 219
-    }
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_Attack01",
+    "graphX": 0,
+    "graphY": 0
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "28e20015-e878-46e6-b316-4d1cadb7e27a"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 156,
-      "y": 219
-    }
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_Attack02",
+    "graphX": 200,
+    "graphY": 80
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "4a31eb3b-9668-48fe-811a-6b0531ab8bdb"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 147,
-      "y": 219
-    }
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_Attack03",
+    "graphX": 200,
+    "graphY": -80
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "cd86cefa-a459-4d7c-af9f-886099c46345"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 184,
-      "y": 226
-    }
+    "__type__": "TransitionConfig",
+    "fromState": "SwordMan_Attack01",
+    "toState": "SwordMan_Attack02",
+    "conditionType": 0,
+    "inputAction": "Attack1",
+    "priority": 0,
+    "canInterrupt": true
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "87ca17a4-69fb-41e7-8c7e-18c60b7fc9d2"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 188,
-      "y": 234
-    }
+    "__type__": "TransitionConfig",
+    "fromState": "SwordMan_Attack02",
+    "toState": "SwordMan_Attack03",
+    "conditionType": 0,
+    "inputAction": "Attack1",
+    "priority": 0,
+    "canInterrupt": true
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "d47229b9-43f8-44c6-9ead-e3c2fdc76b6a"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 236
-    }
+    "__type__": "TransitionConfig",
+    "fromState": "SwordMan_Attack01",
+    "toState": "SwordMan_Attack01",
+    "conditionType": 1,
+    "inputAction": "",
+    "priority": 0,
+    "canInterrupt": true
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "dd4d1f3f-7255-42bd-a9f1-23eb9ae3af49"
-    },
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 237
-    }
+    "__type__": "TransitionConfig",
+    "fromState": "SwordMan_Attack02",
+    "toState": "SwordMan_Attack01",
+    "conditionType": 1,
+    "inputAction": "",
+    "priority": 0,
+    "canInterrupt": true
+  },
+  {
+    "__type__": "TransitionConfig",
+    "fromState": "SwordMan_Attack03",
+    "toState": "SwordMan_Attack01",
+    "conditionType": 1,
+    "inputAction": "",
+    "priority": 0,
+    "canInterrupt": true
   },
   {
     "__type__": "cc.PrefabInfo",
