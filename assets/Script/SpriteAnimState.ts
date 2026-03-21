@@ -15,7 +15,7 @@ export class FrameData {
 /**
  * 单个状态的动画数据
  * 使用方式：创建空节点 → 挂此组件 → 配置帧数据 → 保存为 Prefab
- * 将 Prefab 放入 resources 下的状态文件夹中供 UnitStateMachine 加载
+ * 将 Prefab 放入 resources 下的状态文件夹中供 StateMachineComponent 加载
  */
 @ccclass
 export default class SpriteAnimState extends cc.Component {
