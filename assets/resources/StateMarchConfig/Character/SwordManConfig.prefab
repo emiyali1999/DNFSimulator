@@ -24,7 +24,7 @@
       }
     ],
     "_prefab": {
-      "__id__": 11
+      "__id__": 18
     },
     "_opacity": 255,
     "_color": {
@@ -81,100 +81,178 @@
       "__id__": 1
     },
     "_enabled": true,
-    "defaultState": "SwordMan_Attack01",
+    "defaultState": "SwordMan_StandBattle",
     "animStatesFolder": "AnimState/Character/SwordMan",
     "states": [
       {
         "__id__": 3
       },
       {
-        "__id__": 4
-      },
-      {
-        "__id__": 5
-      }
-    ],
-    "transitions": [
-      {
         "__id__": 6
-      },
-      {
-        "__id__": 7
-      },
-      {
-        "__id__": 8
       },
       {
         "__id__": 9
       },
       {
-        "__id__": 10
+        "__id__": 12
+      },
+      {
+        "__id__": 13
+      },
+      {
+        "__id__": 14
+      },
+      {
+        "__id__": 15
+      },
+      {
+        "__id__": 17
       }
     ],
+    "globalTransitions": [],
     "_id": ""
   },
   {
     "__type__": "StateNodeConfig",
     "stateName": "SwordMan_Attack01",
-    "graphX": 0,
-    "graphY": 0
+    "transitions": [
+      {
+        "__id__": 4
+      },
+      {
+        "__id__": 5
+      }
+    ]
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_StandBattle",
+    "conditionType": 1,
+    "inputAction": "",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Attack02",
+    "conditionType": 0,
+    "inputAction": "X",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": 5,
+    "maxFrame": -1,
+    "conditions": []
   },
   {
     "__type__": "StateNodeConfig",
     "stateName": "SwordMan_Attack02",
-    "graphX": 200,
-    "graphY": 80
+    "transitions": [
+      {
+        "__id__": 7
+      },
+      {
+        "__id__": 8
+      }
+    ]
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_StandBattle",
+    "conditionType": 1,
+    "inputAction": "",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Attack03",
+    "conditionType": 0,
+    "inputAction": "X",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": 5,
+    "maxFrame": -1,
+    "conditions": []
   },
   {
     "__type__": "StateNodeConfig",
     "stateName": "SwordMan_Attack03",
-    "graphX": 200,
-    "graphY": -80
+    "transitions": [
+      {
+        "__id__": 10
+      },
+      {
+        "__id__": 11
+      }
+    ]
   },
   {
-    "__type__": "TransitionConfig",
-    "fromState": "SwordMan_Attack01",
-    "toState": "SwordMan_Attack02",
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_StandBattle",
+    "conditionType": 1,
+    "inputAction": "X",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Attack01",
     "conditionType": 0,
-    "inputAction": "Attack1",
+    "inputAction": "X",
     "priority": 0,
-    "canInterrupt": true
+    "canInterrupt": true,
+    "minFrame": 5,
+    "maxFrame": -1,
+    "conditions": []
   },
   {
-    "__type__": "TransitionConfig",
-    "fromState": "SwordMan_Attack02",
-    "toState": "SwordMan_Attack03",
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_Death",
+    "transitions": []
+  },
+  {
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_Jump",
+    "transitions": []
+  },
+  {
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_Run",
+    "transitions": []
+  },
+  {
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_StandBattle",
+    "transitions": [
+      {
+        "__id__": 16
+      }
+    ]
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Attack01",
     "conditionType": 0,
-    "inputAction": "Attack1",
+    "inputAction": "X",
     "priority": 0,
-    "canInterrupt": true
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
   },
   {
-    "__type__": "TransitionConfig",
-    "fromState": "SwordMan_Attack01",
-    "toState": "SwordMan_Attack01",
-    "conditionType": 1,
-    "inputAction": "",
-    "priority": 0,
-    "canInterrupt": true
-  },
-  {
-    "__type__": "TransitionConfig",
-    "fromState": "SwordMan_Attack02",
-    "toState": "SwordMan_Attack01",
-    "conditionType": 1,
-    "inputAction": "",
-    "priority": 0,
-    "canInterrupt": true
-  },
-  {
-    "__type__": "TransitionConfig",
-    "fromState": "SwordMan_Attack03",
-    "toState": "SwordMan_Attack01",
-    "conditionType": 1,
-    "inputAction": "",
-    "priority": 0,
-    "canInterrupt": true
+    "__type__": "StateNodeConfig",
+    "stateName": "SwordMan_StandNormal",
+    "transitions": []
   },
   {
     "__type__": "cc.PrefabInfo",

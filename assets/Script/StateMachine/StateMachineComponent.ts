@@ -7,10 +7,10 @@
  *   - 驱动 SpriteAnimPlayer 播放对应动画
  */
 
-import StateMachineConfig, { ConditionType, TransitionConfig } from "./StateMachineConfig";
+import StateMachineConfig, { ConditionType, CompareOp, OutgoingTransition, StateNodeConfig } from "./StateMachineConfig";
 import SpriteAnimPlayer from "../SpriteAnimPlayer";
 import SpriteAnimState from "../SpriteAnimState";
-import { InputAction, initKeyMap, KEY_ACTION_MAP } from "./InputAction";
+import { initKeyMap, KEY_ACTION_MAP } from "./InputAction";
 
 const { ccclass, property } = cc._decorator;
 
@@ -30,6 +30,9 @@ export default class StateMachineComponent extends cc.Component {
     private _currentState: string = "";
     private _animStateMap: Map<string, SpriteAnimState> = new Map();
     private _loaded: boolean = false;
+
+    /** 角色参数表，外部通过 setParameter / getParameter 读写 */
+    private _params: { [key: string]: number } = {};
 
     /** 当前帧待处理的输入动作队列 */
     private _pendingInputs: string[] = [];
@@ -110,7 +113,23 @@ export default class StateMachineComponent extends cc.Component {
             }
 
             cc.log(`[StateMachineComponent] 已加载 ${this._animStateMap.size} 个动画状态: [${Array.from(this._animStateMap.keys()).join(", ")}]`);
-            this._finishLoad();
+
+            // 批量预加载所有状态的序列帧图片，全部完成后再初始化状态机
+            const states = Array.from(this._animStateMap.values());
+            let remaining = states.length;
+            if (remaining === 0) {
+                this._finishLoad();
+                return;
+            }
+            for (const state of states) {
+                state.preload((err) => {
+                    if (err) cc.warn(`[StateMachineComponent] ${err.message}`);
+                    remaining--;
+                    if (remaining === 0) {
+                        this._finishLoad();
+                    }
+                });
+            }
         });
     }
 
@@ -136,40 +155,80 @@ export default class StateMachineComponent extends cc.Component {
 
     /**
      * 查找并执行满足条件的最高优先级转换
+     * 先查当前状态的 transitions，再查 globalTransitions，取最高优先级
      * @param conditionType 触发条件类型
      * @param inputAction   当 conditionType = OnInput 时，对应的输入动作名
      */
     private _tryTransition(conditionType: ConditionType, inputAction: string | null) {
         if (!this._config) return;
 
-        let best: TransitionConfig = null;
+        let best: OutgoingTransition = null;
 
-        for (const t of this._config.transitions) {
-            // 检查源状态匹配
-            if (t.fromState !== "*" && t.fromState !== this._currentState) continue;
-            // 检查条件类型匹配
-            if (t.conditionType !== conditionType) continue;
-            // 检查输入动作匹配
-            if (conditionType === ConditionType.OnInput && t.inputAction !== inputAction) continue;
-            // 检查打断权限（非 canInterrupt 时需等动画结束，但 OnAnimFinish 本身已是动画结束）
-            if (!t.canInterrupt && conditionType !== ConditionType.OnAnimFinish) {
-                const animState = this._animStateMap.get(this._currentState);
-                if (animState && !animState.loop && this.animPlayer) {
-                    // 动画还在播放中，不允许打断
-                    // 利用 animPlayer 的 _playing 状态（通过检查帧索引是否是最后一帧）
-                    // 此处保守处理：如动画未结束则跳过
-                    continue;
+        // 当前状态的出向转换
+        const stateCfg = this._findStateCfg(this._currentState);
+        const localList = stateCfg ? stateCfg.transitions : [];
+
+        // 全局转换（任意状态均可触发）
+        const globalList = this._config.globalTransitions;
+
+        const lists = [localList, globalList];
+        for (let li = 0; li < lists.length; li++) {
+            const list = lists[li];
+            for (let i = 0; i < list.length; i++) {
+                const t = list[i];
+                if (t.conditionType !== conditionType) continue;
+                if (conditionType === ConditionType.OnInput && t.inputAction !== inputAction) continue;
+                if (!t.canInterrupt && conditionType !== ConditionType.OnAnimFinish) {
+                    const animState = this._animStateMap.get(this._currentState);
+                    if (animState && !animState.loop && this.animPlayer) continue;
                 }
-            }
-
-            if (!best || t.priority > best.priority) {
-                best = t;
+                if (!this._checkExtraConditions(t)) continue;
+                if (!best || t.priority > best.priority) {
+                    best = t;
+                }
             }
         }
 
         if (best) {
             this._enterState(best.toState);
         }
+    }
+
+    /**
+     * 校验帧窗口 + 参数条件，全部通过才返回 true
+     */
+    private _checkExtraConditions(t: OutgoingTransition): boolean {
+        // 帧窗口检查
+        if (t.minFrame >= 0 || t.maxFrame >= 0) {
+            const frame = this.animPlayer ? this.animPlayer.currentFrameIndex : 0;
+            if (t.minFrame >= 0 && frame < t.minFrame) return false;
+            if (t.maxFrame >= 0 && frame > t.maxFrame) return false;
+        }
+
+        // 参数条件检查（所有条件须同时满足）
+        for (let i = 0; i < t.conditions.length; i++) {
+            const c = t.conditions[i];
+            const actual = this._params[c.paramName] !== undefined ? this._params[c.paramName] : 0;
+            let pass = false;
+            switch (c.compareOp) {
+                case CompareOp.Equal:          pass = actual === c.value; break;
+                case CompareOp.NotEqual:       pass = actual !== c.value; break;
+                case CompareOp.Greater:        pass = actual >   c.value; break;
+                case CompareOp.GreaterOrEqual: pass = actual >=  c.value; break;
+                case CompareOp.Less:           pass = actual <   c.value; break;
+                case CompareOp.LessOrEqual:    pass = actual <=  c.value; break;
+            }
+            if (!pass) return false;
+        }
+        return true;
+    }
+
+    private _findStateCfg(stateName: string): StateNodeConfig | null {
+        const states = this._config.states;
+        for (let i = 0; i < states.length; i++) {
+            if (states[i].stateName === stateName) return states[i];
+        }
+        return null;
     }
 
     private _enterState(stateName: string) {
@@ -215,9 +274,9 @@ export default class StateMachineComponent extends cc.Component {
      * 手动触发输入动作（供 AI 或其他外部系统调用）
      * @param action InputAction 枚举值或其字符串名称
      */
-    triggerInput(action: InputAction | string) {
+    triggerInput(action: string) {
         if (this._loaded) {
-            this._pendingInputs.push(action as string);
+            this._pendingInputs.push(action);
         }
     }
 
@@ -226,5 +285,21 @@ export default class StateMachineComponent extends cc.Component {
      */
     forceChangeState(stateName: string) {
         this._enterState(stateName);
+    }
+
+    /**
+     * 设置角色参数，供转换条件检查使用
+     * @param key   参数名，与 ParameterCondition.paramName 对应
+     * @param value 数值（未设置过的参数默认视为 0）
+     */
+    setParameter(key: string, value: number) {
+        this._params[key] = value;
+    }
+
+    /**
+     * 读取角色参数（未设置过返回 0）
+     */
+    getParameter(key: string): number {
+        return this._params[key] !== undefined ? this._params[key] : 0;
     }
 }

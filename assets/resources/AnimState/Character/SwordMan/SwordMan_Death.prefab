@@ -13,7 +13,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "SwordMan_Attack01",
+    "_name": "SwordMan_Death",
     "_objFlags": 0,
     "_parent": null,
     "_children": [],
@@ -24,7 +24,7 @@
       }
     ],
     "_prefab": {
-      "__id__": 10
+      "__id__": 9
     },
     "_opacity": 255,
     "_color": {
@@ -81,10 +81,10 @@
       "__id__": 1
     },
     "_enabled": true,
-    "stateName": "SwordMan_Attack01",
+    "stateName": "SwordMan_Death",
     "spriteFolderPath": "Texture/Character/SwordMan",
-    "startIndex": 0,
-    "endIndex": 6,
+    "startIndex": 45,
+    "endIndex": 50,
     "offsets": [
       {
         "__id__": 3
@@ -103,9 +103,6 @@
       },
       {
         "__id__": 8
-      },
-      {
-        "__id__": 9
       }
     ],
     "fps": 10,
@@ -116,56 +113,48 @@
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 154,
-      "y": 219
+      "x": 176,
+      "y": 222
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 156,
-      "y": 219
+      "x": 186,
+      "y": 216
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 147,
-      "y": 219
+      "x": 166,
+      "y": 273
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 184,
-      "y": 226
+      "x": 159,
+      "y": 271
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 188,
-      "y": 234
+      "x": 162,
+      "y": 306
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 236
-    }
-  },
-  {
-    "__type__": "FrameOffset",
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 237
+      "x": 162,
+      "y": 306
     }
   },
   {

@@ -82,7 +82,10 @@
     },
     "_enabled": true,
     "stateName": "SwordMan_Attack02",
-    "frames": [
+    "spriteFolderPath": "Texture/Character/SwordMan",
+    "startIndex": 7,
+    "endIndex": 13,
+    "offsets": [
       {
         "__id__": 3
       },
@@ -110,10 +113,7 @@
     "_id": ""
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "d2661667-3019-47af-9db1-2a2a9d120bdf"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 170,
@@ -121,10 +121,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "0dcd43b3-3f95-4155-bac2-6b9b3a5792b0"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 198,
@@ -132,10 +129,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "a55becd0-16ab-40a9-ace9-4ca6bcb89ce2"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 167,
@@ -143,47 +137,35 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "f0b87c99-3315-440a-a3b3-92e4365ce6c7"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 103,
-      "y": 233
+      "y": 232
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "7e7b6872-3220-4ca5-ae45-9c95f6f5b05a"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 103,
-      "y": 233
+      "y": 232
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "25bd4f1f-f8ab-4dbc-9b9b-ea5c1abbbed4"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 103,
-      "y": 233
+      "y": 232
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "9ade2057-8e96-4edd-86c4-37a7ebede8fe"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 103,
-      "y": 233
+      "y": 232
     }
   },
   {

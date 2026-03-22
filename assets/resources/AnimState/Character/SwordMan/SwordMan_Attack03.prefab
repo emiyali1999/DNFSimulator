@@ -82,7 +82,10 @@
     },
     "_enabled": true,
     "stateName": "SwordMan_Attack03",
-    "frames": [
+    "spriteFolderPath": "Texture/Character/SwordMan",
+    "startIndex": 14,
+    "endIndex": 20,
+    "offsets": [
       {
         "__id__": 3
       },
@@ -110,10 +113,7 @@
     "_id": ""
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "eeff731c-3aa6-4b07-8b77-bf35146bbde6"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 118,
@@ -121,10 +121,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "501d815a-618c-4b36-a654-02c87fff57de"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 147,
@@ -132,10 +129,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "0ea877e9-a97c-4617-8abe-65119e79deef"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 252,
@@ -143,10 +137,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "f3cd76dc-f507-45ca-9511-f1f09fd66138"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 250,
@@ -154,10 +145,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "1cbf99f9-03d7-485e-9125-2e528577dedd"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 251,
@@ -165,10 +153,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "84cc3b2c-fcc7-46d9-9b56-0ec56ace53c2"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 255,
@@ -176,10 +161,7 @@
     }
   },
   {
-    "__type__": "FrameData",
-    "spriteFrame": {
-      "__uuid__": "f755c68d-3f27-4076-8109-847590ffad04"
-    },
+    "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
       "x": 257,

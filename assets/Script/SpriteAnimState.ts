@@ -1,33 +1,126 @@
 const { ccclass, property } = cc._decorator;
 
 /**
- * 单帧数据
+ * 单帧偏移数据
  */
-@ccclass("FrameData")
-export class FrameData {
-    @property(cc.SpriteFrame)
-    spriteFrame: cc.SpriteFrame = null;
-
+@ccclass("FrameOffset")
+export class FrameOffset {
     @property(cc.Vec2)
     offset: cc.Vec2 = cc.Vec2.ZERO;
 }
 
 /**
  * 单个状态的动画数据
- * 使用方式：创建空节点 → 挂此组件 → 配置帧数据 → 保存为 Prefab
- * 将 Prefab 放入 resources 下的状态文件夹中供 StateMachineComponent 加载
+ *
+ * 配置方式：
+ *   1. 将序列帧图片（以数字命名，如 0.png、1.png …）放入 resources 下某个文件夹
+ *   2. 设置 spriteFolderPath 为该文件夹的 resources 相对路径（不含扩展名）
+ *      例如："Textures/Player/Idle"
+ *   3. 填写 startIndex / endIndex 指定使用哪段连续帧
+ *   4. offsets 数组长度须等于 endIndex - startIndex + 1，每项对应一帧的偏移
+ *      （若某帧不需要偏移可保持 Vec2.ZERO，数组留空则所有帧偏移均为零）
+ *   5. 保存为 Prefab，放入 StateMachineConfig.animStatesFolder 所指的文件夹
  */
 @ccclass
 export default class SpriteAnimState extends cc.Component {
+
     @property
     stateName: string = "";
 
-    @property([FrameData])
-    frames: FrameData[] = [];
+    /**
+     * 序列帧图片所在的 resources 相对路径（文件夹），图片以纯数字命名
+     * 例如："Textures/Player/Idle"，则运行时加载 "Textures/Player/Idle/0"、"…/1" …
+     */
+    @property
+    spriteFolderPath: string = "";
+
+    /** 起始帧索引（含） */
+    @property
+    startIndex: number = 0;
+
+    /** 终止帧索引（含） */
+    @property
+    endIndex: number = 0;
+
+    /**
+     * 每帧偏移，数组长度应等于 endIndex - startIndex + 1
+     * 超出部分忽略，不足部分用 Vec2.ZERO 补齐
+     */
+    @property([FrameOffset])
+    offsets: FrameOffset[] = [];
 
     @property
     fps: number = 10;
 
     @property
     loop: boolean = true;
+
+    // ── 运行时缓存 ────────────────────────────────────────────
+    private _frames: cc.SpriteFrame[] = null;
+
+    // ── 公共接口 ─────────────────────────────────────────────
+
+    /** 帧数量（= endIndex - startIndex + 1） */
+    get frameCount(): number {
+        return Math.max(0, this.endIndex - this.startIndex + 1);
+    }
+
+    /** 是否已完成预加载 */
+    isLoaded(): boolean {
+        return this._frames !== null;
+    }
+
+    /** 获取第 localIndex 帧的 SpriteFrame（localIndex 从 0 开始） */
+    getFrame(localIndex: number): cc.SpriteFrame {
+        return this._frames ? (this._frames[localIndex] ?? null) : null;
+    }
+
+    /** 获取第 localIndex 帧的偏移（不足则返回 Vec2.ZERO） */
+    getOffset(localIndex: number): cc.Vec2 {
+        const f = this.offsets[localIndex];
+        return f ? f.offset : cc.Vec2.ZERO;
+    }
+
+    /**
+     * 预加载所有帧的 SpriteFrame
+     * 由 StateMachineComponent 在初始化阶段调用，完成后回调 callback
+     */
+    preload(callback: (err?: Error) => void) {
+        if (this._frames) {
+            callback();
+            return;
+        }
+
+        const count = this.frameCount;
+        if (count <= 0 || !this.spriteFolderPath) {
+            this._frames = [];
+            callback();
+            return;
+        }
+
+        const frames: cc.SpriteFrame[] = new Array(count).fill(null);
+        let remaining = count;
+        let anyError = false;
+
+        for (let i = 0; i < count; i++) {
+            const localI = i;
+            const imgIndex = this.startIndex + i;
+            const path = `${this.spriteFolderPath}/${imgIndex}`;
+
+            cc.resources.load(path, cc.SpriteFrame, (err, sf: cc.SpriteFrame) => {
+                if (err) {
+                    cc.warn(`[SpriteAnimState "${this.stateName}"] 加载帧失败: ${path}`, err);
+                    anyError = true;
+                } else {
+                    frames[localI] = sf;
+                }
+
+                remaining--;
+                if (remaining === 0) {
+                    this._frames = frames;
+                    callback(anyError ? new Error(`"${this.stateName}" 部分帧加载失败`) : undefined);
+                }
+            });
+        }
+    }
 }

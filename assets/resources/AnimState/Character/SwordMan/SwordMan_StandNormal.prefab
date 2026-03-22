@@ -13,7 +13,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "SwordMan_Attack01",
+    "_name": "SwordMan_StandNormal",
     "_objFlags": 0,
     "_parent": null,
     "_children": [],
@@ -24,7 +24,7 @@
       }
     ],
     "_prefab": {
-      "__id__": 10
+      "__id__": 7
     },
     "_opacity": 255,
     "_color": {
@@ -81,10 +81,10 @@
       "__id__": 1
     },
     "_enabled": true,
-    "stateName": "SwordMan_Attack01",
+    "stateName": "SwordMan_StandNormal",
     "spriteFolderPath": "Texture/Character/SwordMan",
-    "startIndex": 0,
-    "endIndex": 6,
+    "startIndex": 94,
+    "endIndex": 97,
     "offsets": [
       {
         "__id__": 3
@@ -97,75 +97,42 @@
       },
       {
         "__id__": 6
-      },
-      {
-        "__id__": 7
-      },
-      {
-        "__id__": 8
-      },
-      {
-        "__id__": 9
       }
     ],
-    "fps": 10,
-    "loop": false,
+    "fps": 5,
+    "loop": true,
     "_id": ""
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 154,
-      "y": 219
+      "x": 195,
+      "y": 214
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 156,
-      "y": 219
+      "x": 195,
+      "y": 214
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 147,
-      "y": 219
+      "x": 195,
+      "y": 214
     }
   },
   {
     "__type__": "FrameOffset",
     "offset": {
       "__type__": "cc.Vec2",
-      "x": 184,
-      "y": 226
-    }
-  },
-  {
-    "__type__": "FrameOffset",
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 188,
-      "y": 234
-    }
-  },
-  {
-    "__type__": "FrameOffset",
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 236
-    }
-  },
-  {
-    "__type__": "FrameOffset",
-    "offset": {
-      "__type__": "cc.Vec2",
-      "x": 141,
-      "y": 237
+      "x": 195,
+      "y": 214
     }
   },
   {

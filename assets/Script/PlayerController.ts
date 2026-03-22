@@ -5,7 +5,6 @@
  */
 
 import StateMachineComponent from "./StateMachine/StateMachineComponent";
-import { InputAction } from "./StateMachine/InputAction";
 
 const { ccclass, property } = cc._decorator;
 

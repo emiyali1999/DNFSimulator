@@ -27,7 +27,7 @@ export default class SpriteAnimPlayer extends cc.Component {
     }
 
     play(state: SpriteAnimState) {
-        if (!state || state.frames.length === 0) return;
+        if (!state || state.frameCount === 0) return;
 
         this._currentState = state;
         this._frameIndex = 0;
@@ -71,11 +71,11 @@ export default class SpriteAnimPlayer extends cc.Component {
         this._elapsed -= interval;
         this._frameIndex++;
 
-        if (this._frameIndex >= state.frames.length) {
+        if (this._frameIndex >= state.frameCount) {
             if (state.loop) {
                 this._frameIndex = 0;
             } else {
-                this._frameIndex = state.frames.length - 1;
+                this._frameIndex = state.frameCount - 1;
                 this._playing = false;
                 this.node.emit("anim-finished", state.stateName);
                 return;
@@ -86,15 +86,18 @@ export default class SpriteAnimPlayer extends cc.Component {
     }
 
     private _applyFrame(index: number) {
-        const frame = this._currentState.frames[index];
-        if (!frame || !this._sprite || !frame.spriteFrame) return;
+        if (!this._currentState || !this._sprite) return;
 
-        this._sprite.spriteFrame = frame.spriteFrame;
-        const size = frame.spriteFrame.getOriginalSize();
+        const sf = this._currentState.getFrame(index);
+        if (!sf) return;
+
+        this._sprite.spriteFrame = sf;
+        const size = sf.getOriginalSize();
         this._spriteNode.setContentSize(size);
+        const offset = this._currentState.getOffset(index);
         this._spriteNode.setPosition(
-            frame.offset.x + this.globalOffset.x,
-            -frame.offset.y - this.globalOffset.y
+            offset.x + this.globalOffset.x,
+            -offset.y - this.globalOffset.y
         );
     }
 }

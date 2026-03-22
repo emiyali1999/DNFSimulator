@@ -3,11 +3,11 @@
  *
  * 使用方法：
  *   1. 在场景中创建空节点，挂载 StateMachineConfig 组件
- *   2. 在 Inspector 里配置 states 和 transitions
- *      - states: 每个状态填写 stateName，以及 graphX/Y（决定可视化图中的布局位置）
- *      - transitions: 配置从哪个状态 + 什么条件 → 到哪个状态
- *   3. 将节点保存为 Prefab，放入 resources 目录
- *   4. 在 StateMachineComponent.configPrefab 中引用该 Prefab
+ *   2. 在 states 数组中添加每个状态：填写 stateName，
+ *      然后在该状态的 transitions 子数组里配置可以转到哪几个状态
+ *   3. 若某条转换需要从"任意状态"触发，在 globalTransitions 里配置
+ *   4. 将节点保存为 Prefab，放入 resources 目录
+ *   5. 在 StateMachineComponent.configPrefab 中引用该 Prefab
  */
 
 const { ccclass, property } = cc._decorator;
@@ -22,29 +22,39 @@ export enum ConditionType {
     Immediate = 2,
 }
 
-/** 单个状态节点配置 */
-@ccclass("StateNodeConfig")
-export class StateNodeConfig {
-    /** 状态唯一名称，对应 SpriteAnimState.stateName */
-    @property
-    stateName: string = "";
-
-    /** 在可视化状态图中的 X 坐标（编辑器里调整布局用） */
-    @property
-    graphX: number = 0;
-
-    /** 在可视化状态图中的 Y 坐标（编辑器里调整布局用） */
-    @property
-    graphY: number = 0;
+/** 参数比较运算符 */
+export enum CompareOp {
+    Equal          = 0,   // ==
+    NotEqual       = 1,   // !=
+    Greater        = 2,   // >
+    GreaterOrEqual = 3,   // >=
+    Less           = 4,   // <
+    LessOrEqual    = 5,   // <=
 }
 
-/** 单条状态转换规则 */
-@ccclass("TransitionConfig")
-export class TransitionConfig {
-    /** 源状态名，填 "*" 表示任意状态均可触发 */
+/**
+ * 单条参数条件
+ * 所有条件均满足时，转换才允许触发
+ * 例：paramName="stunned", compareOp=Equal, value=0 → 角色未眩晕时才可切换
+ */
+@ccclass("ParameterCondition")
+export class ParameterCondition {
+    /** 参数名，对应 StateMachineComponent.setParameter() 设置的 key */
     @property
-    fromState: string = "";
+    paramName: string = "";
 
+    @property({ type: cc.Enum(CompareOp) })
+    compareOp: CompareOp = CompareOp.Equal;
+
+    @property
+    value: number = 0;
+}
+
+/**
+ * 单条出向转换规则（挂在具体状态下，无需再填 fromState）
+ */
+@ccclass("OutgoingTransition")
+export class OutgoingTransition {
     /** 目标状态名 */
     @property
     toState: string = "";
@@ -54,8 +64,8 @@ export class TransitionConfig {
     conditionType: ConditionType = ConditionType.OnInput;
 
     /**
-     * 当 conditionType = OnInput 时，填写对应的 InputAction 名称
-     * 例如："Attack1"、"Jump"、"MoveLeft"
+     * 当 conditionType = OnInput 时，填写对应的按键名
+     * 例如："X"、"Z"、"Space"
      */
     @property
     inputAction: string = "";
@@ -74,6 +84,42 @@ export class TransitionConfig {
      */
     @property
     canInterrupt: boolean = true;
+
+    /**
+     * 允许触发的最小帧索引（含），-1 表示不限
+     * 例：minFrame=5 表示当前动画播到第 5 帧后才允许触发此转换
+     */
+    @property
+    minFrame: number = -1;
+
+    /**
+     * 允许触发的最大帧索引（含），-1 表示不限
+     * 与 minFrame 组合使用可定义"帧窗口"
+     */
+    @property
+    maxFrame: number = -1;
+
+    /**
+     * 参数条件列表，所有条件同时满足时转换才生效
+     * 留空则不做参数检查
+     */
+    @property([ParameterCondition])
+    conditions: ParameterCondition[] = [];
+}
+
+/**
+ * 单个状态节点配置
+ * 展开后可在 transitions 子数组里直接填写"从该状态能转到哪里"
+ */
+@ccclass("StateNodeConfig")
+export class StateNodeConfig {
+    /** 状态唯一名称，对应 SpriteAnimState.stateName */
+    @property
+    stateName: string = "";
+
+    /** 从该状态出发的所有转换规则 */
+    @property([OutgoingTransition])
+    transitions: OutgoingTransition[] = [];
 }
 
 /** 状态机配置组件，保存为 Prefab 供 StateMachineComponent 引用 */
@@ -87,11 +133,17 @@ export default class StateMachineConfig extends cc.Component {
     @property
     animStatesFolder: string = "";
 
-    /** 所有状态节点配置（决定可视化图布局） */
-    @property({ type: [StateNodeConfig] })
+    /**
+     * 所有状态节点配置
+     * 展开每一项可设置该状态能转换到哪些状态
+     */
+    @property([StateNodeConfig])
     states: StateNodeConfig[] = [];
 
-    /** 所有状态转换规则 */
-    @property({ type: [TransitionConfig] })
-    transitions: TransitionConfig[] = [];
+    /**
+     * 全局转换（相当于 fromState = "*"）
+     * 无论当前处于哪个状态，只要满足条件就会触发
+     */
+    @property([OutgoingTransition])
+    globalTransitions: OutgoingTransition[] = [];
 }
