@@ -115,11 +115,11 @@ export default class StateMachineVisualizer extends cc.Component {
         const aW = this._areaW;
         const aH = this._areaH;
 
-        // 背景面板
-        g.fillColor = cc.color(8, 10, 20, 190);
+        // 背景面板（低透明度，不遮挡玩家）
+        g.fillColor = cc.color(8, 10, 20, 70);
         g.roundRect(-aW / 2, -aH / 2, aW, aH, 10);
         g.fill();
-        g.strokeColor = cc.color(80, 90, 140, 180);
+        g.strokeColor = cc.color(80, 90, 140, 90);
         g.lineWidth = 1;
         g.roundRect(-aW / 2, -aH / 2, aW, aH, 10);
         g.stroke();

@@ -15,6 +15,8 @@ export default class SpriteAnimPlayer extends cc.Component {
     private _elapsed: number = 0;
     private _playing: boolean = false;
     private _paused: boolean = false;
+    /** 临时覆盖 fps，-1 表示使用 state.fps，由外部（如跳跃同步）设置 */
+    private _fpsOverride: number = -1;
 
     onLoad() {
         this._spriteNode = new cc.Node("SpriteDisplay");
@@ -34,8 +36,17 @@ export default class SpriteAnimPlayer extends cc.Component {
         this._elapsed = 0;
         this._playing = true;
         this._paused = false;
+        this._fpsOverride = -1;     // 每次 play 重置 override
 
         this._applyFrame(0);
+    }
+
+    /**
+     * 临时覆盖当前动画的播放帧率，使动画总时长 = frameCount / fps
+     * 传入 -1 恢复使用 state.fps
+     */
+    setFpsOverride(fps: number) {
+        this._fpsOverride = fps;
     }
 
     get currentFrameIndex(): number { return this._frameIndex; }
@@ -63,7 +74,8 @@ export default class SpriteAnimPlayer extends cc.Component {
         if (!this._playing || this._paused || !this._currentState) return;
 
         const state = this._currentState;
-        const interval = 1 / state.fps;
+        const fps = this._fpsOverride > 0 ? this._fpsOverride : state.fps;
+        const interval = 1 / fps;
 
         this._elapsed += dt;
         if (this._elapsed < interval) return;

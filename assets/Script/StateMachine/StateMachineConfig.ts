@@ -20,6 +20,10 @@ export enum ConditionType {
     OnAnimFinish = 1,
     /** 进入 fromState 后立即触发（常用于过渡状态） */
     Immediate = 2,
+    /** 松开某个输入动作时触发 */
+    OnInputRelease = 3,
+    /** 在时间窗口内连按两次同一动作时触发 */
+    OnDoubleTap = 4,
 }
 
 /** 参数比较运算符 */

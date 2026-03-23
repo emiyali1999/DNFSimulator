@@ -36,6 +36,16 @@ export default class StateMachineComponent extends cc.Component {
 
     /** 当前帧待处理的输入动作队列 */
     private _pendingInputs: string[] = [];
+    /** 当前帧待处理的松键队列 */
+    private _pendingReleases: string[] = [];
+    /** 当前帧待处理的双击队列 */
+    private _pendingDoubleTaps: string[] = [];
+    /** 各动作上次按下的时间戳（秒），用于双击检测 */
+    private _lastTapTime: { [key: string]: number } = {};
+    /** 双击判定时间窗口（秒） */
+    private readonly _DOUBLE_TAP_WINDOW = 0.3;
+    /** 当前正在按住的动作集合，用于防止松键时对手方向还在按导致误触发 */
+    private _heldKeys: Set<string> = new Set();
 
     // ── 生命周期 ─────────────────────────────────────────────
     onLoad() {
@@ -56,6 +66,7 @@ export default class StateMachineComponent extends cc.Component {
 
         // 注册键盘输入
         cc.systemEvent.on(cc.SystemEvent.EventType.KEY_DOWN, this._onKeyDown, this);
+        cc.systemEvent.on(cc.SystemEvent.EventType.KEY_UP,   this._onKeyUp,   this);
 
         // 监听动画结束事件
         if (this.animPlayer) {
@@ -67,6 +78,7 @@ export default class StateMachineComponent extends cc.Component {
 
     onDestroy() {
         cc.systemEvent.off(cc.SystemEvent.EventType.KEY_DOWN, this._onKeyDown, this);
+        cc.systemEvent.off(cc.SystemEvent.EventType.KEY_UP,   this._onKeyUp,   this);
         if (this.animPlayer) {
             this.animPlayer.node.off("anim-finished", this._onAnimFinished, this);
         }
@@ -77,12 +89,47 @@ export default class StateMachineComponent extends cc.Component {
     }
 
     update(_dt: number) {
-        if (!this._loaded || this._pendingInputs.length === 0) return;
+        if (!this._loaded) return;
 
-        for (const action of this._pendingInputs) {
-            this._tryTransition(ConditionType.OnInput, action);
+        // 双击优先处理，避免被单击覆盖
+        if (this._pendingDoubleTaps.length > 0) {
+            for (const action of this._pendingDoubleTaps) {
+                this._tryTransition(ConditionType.OnDoubleTap, action);
+            }
+            this._pendingDoubleTaps.length = 0;
         }
-        this._pendingInputs.length = 0;
+
+        if (this._pendingInputs.length > 0) {
+            for (const action of this._pendingInputs) {
+                this._tryTransition(ConditionType.OnInput, action);
+            }
+            this._pendingInputs.length = 0;
+        }
+
+        if (this._pendingReleases.length > 0) {
+            for (const action of this._pendingReleases) {
+                // 方向键松开时，若还有方向键被按住则不停止，改为触发对应 OnInput
+                if (action === 'Left' || action === 'Right') {
+                    const hasLeft  = this._heldKeys.has('Left');
+                    const hasRight = this._heldKeys.has('Right');
+                    if (hasLeft || hasRight) {
+                        // 两个都按着时以"仍然按住的那个"为准（另一个刚松开）
+                        const activeDir = (hasLeft && hasRight)
+                            ? (action === 'Left' ? 'Right' : 'Left')
+                            : (hasLeft ? 'Left' : 'Right');
+                        this._tryTransition(ConditionType.OnInput, activeDir);
+                        continue;
+                    }
+                    // 仅剩上下键按住：维持当前移动状态，不触发停止
+                    if (this._heldKeys.has('Up')   || this._heldKeys.has('W') ||
+                        this._heldKeys.has('Down') || this._heldKeys.has('S')) {
+                        continue;
+                    }
+                }
+                this._tryTransition(ConditionType.OnInputRelease, action);
+            }
+            this._pendingReleases.length = 0;
+        }
     }
 
     // ── 私有方法 ─────────────────────────────────────────────
@@ -144,9 +191,51 @@ export default class StateMachineComponent extends cc.Component {
 
     private _onKeyDown(event: cc.Event.EventKeyboard) {
         const action = KEY_ACTION_MAP[event.keyCode];
-        if (action) {
-            this._pendingInputs.push(action);
+        if (!action) return;
+
+        this._heldKeys.add(action);
+
+        // 左右键翻转朝向（默认图片朝右）
+        if (action === 'Left')  this.node.scaleX = -Math.abs(this.node.scaleX);
+        if (action === 'Right') this.node.scaleX =  Math.abs(this.node.scaleX);
+
+        // 双击检测：窗口内再次按下同一键则记为双击
+        const now = Date.now() / 1000;
+        const last = this._lastTapTime[action] || -999;
+        if (now - last < this._DOUBLE_TAP_WINDOW) {
+            this._pendingDoubleTaps.push(action);
+            this._lastTapTime[action] = -999; // 消费掉，避免三连也触发
+        } else {
+            this._lastTapTime[action] = now;
         }
+
+        this._pendingInputs.push(action);
+    }
+
+    private _onKeyUp(event: cc.Event.EventKeyboard) {
+        const action = KEY_ACTION_MAP[event.keyCode];
+        if (!action) return;
+
+        this._heldKeys.delete(action);
+
+        // 左右方向键：若还有方向键按住，不触发松键转换（保持 Walk/Run 状态）
+        if (action === 'Left' || action === 'Right') {
+            const otherDir = action === 'Left' ? 'Right' : 'Left';
+            if (this._heldKeys.has(otherDir)) {
+                // 对向水平键按住：切换朝向
+                this.node.scaleX = otherDir === 'Right'
+                    ? Math.abs(this.node.scaleX)
+                    : -Math.abs(this.node.scaleX);
+                return;
+            }
+            // 上下键按住：维持移动状态，无需切换朝向
+            if (this._heldKeys.has('Up')   || this._heldKeys.has('W') ||
+                this._heldKeys.has('Down') || this._heldKeys.has('S')) {
+                return;
+            }
+        }
+
+        this._pendingReleases.push(action);
     }
 
     private _onAnimFinished(_stateName: string) {
@@ -177,7 +266,10 @@ export default class StateMachineComponent extends cc.Component {
             for (let i = 0; i < list.length; i++) {
                 const t = list[i];
                 if (t.conditionType !== conditionType) continue;
-                if (conditionType === ConditionType.OnInput && t.inputAction !== inputAction) continue;
+                if ((conditionType === ConditionType.OnInput ||
+                     conditionType === ConditionType.OnInputRelease ||
+                     conditionType === ConditionType.OnDoubleTap) &&
+                    t.inputAction !== inputAction) continue;
                 if (!t.canInterrupt && conditionType !== ConditionType.OnAnimFinish) {
                     const animState = this._animStateMap.get(this._currentState);
                     if (animState && !animState.loop && this.animPlayer) continue;
@@ -285,6 +377,13 @@ export default class StateMachineComponent extends cc.Component {
      */
     forceChangeState(stateName: string) {
         this._enterState(stateName);
+    }
+
+    /**
+     * 获取指定名称的动画状态对象（供外部读取 frameCount / fps 等属性）
+     */
+    getAnimState(stateName: string): SpriteAnimState | null {
+        return this._animStateMap.get(stateName) ?? null;
     }
 
     /**
