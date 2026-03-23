@@ -16,8 +16,8 @@ function findNodeByUuid(uuid) {
 function searchByUuid(node, uuid) {
   if (!node) return null;
   if (node.uuid === uuid) return node;
-  for (let i = 0; i < node.children.length; i++) {
-    const found = searchByUuid(node.children[i], uuid);
+  for (var i = 0; i < node.children.length; i++) {
+    var found = searchByUuid(node.children[i], uuid);
     if (found) return found;
   }
   return null;
@@ -34,8 +34,8 @@ function findNodeByArgs(args) {
 }
 
 function getNodePath(node) {
-  const parts = [];
-  let cur = node;
+  var parts = [];
+  var cur = node;
   while (cur && !(cur instanceof cc.Scene)) {
     parts.unshift(cur.name);
     cur = cur.parent;
@@ -49,20 +49,17 @@ function serializeNode(node, depth, maxDepth) {
   maxDepth = maxDepth || 5;
   if (depth > maxDepth) return null;
 
-  const components = [];
+  var components = [];
   if (node._components) {
-    for (let i = 0; i < node._components.length; i++) {
-      const c = node._components[i];
-      components.push({
-        type: cc.js.getClassName(c),
-        enabled: c.enabled,
-      });
+    for (var i = 0; i < node._components.length; i++) {
+      var c = node._components[i];
+      components.push({ type: cc.js.getClassName(c), enabled: c.enabled });
     }
   }
 
-  const children = [];
-  for (let i = 0; i < node.children.length; i++) {
-    const child = serializeNode(node.children[i], depth + 1, maxDepth);
+  var children = [];
+  for (var j = 0; j < node.children.length; j++) {
+    var child = serializeNode(node.children[j], depth + 1, maxDepth);
     if (child) children.push(child);
   }
 
@@ -83,266 +80,188 @@ function serializeNode(node, depth, maxDepth) {
 
 function resolveComponentClass(typeName) {
   if (!typeName) return null;
-  // 去掉 'cc.' 前缀
-  const name = typeName.replace(/^cc\./, '');
+  var name = typeName.replace(/^cc\./, '');
   if (cc[name]) return cc[name];
-  // 自定义脚本组件（已在场景中注册的）
   return cc.js.getClassByName(typeName) || cc.js.getClassByName(name) || null;
 }
 
 function hexToColor(hex) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
+  var r = parseInt(hex.slice(1, 3), 16);
+  var g = parseInt(hex.slice(3, 5), 16);
+  var b = parseInt(hex.slice(5, 7), 16);
   return new cc.Color(r, g, b, 255);
 }
 
-// ─── 导出的场景脚本方法 ────────────────────────────────────────────────────────
+function applyProperty(node, property, value) {
+  switch (property) {
+    case 'x':       node.x = value; break;
+    case 'y':       node.y = value; break;
+    case 'width':   node.width = value; break;
+    case 'height':  node.height = value; break;
+    case 'name':    node.name = value; break;
+    case 'active':  node.active = value; break;
+    case 'angle':   node.angle = value; break;
+    case 'scaleX':  node.scaleX = value; break;
+    case 'scaleY':  node.scaleY = value; break;
+    case 'opacity': node.opacity = value; break;
+    case 'anchorX': node.anchorX = value; break;
+    case 'anchorY': node.anchorY = value; break;
+    case 'zIndex':  node.zIndex = value; break;
+    case 'color': {
+      if (typeof value === 'string') {
+        node.color = hexToColor(value);
+      } else {
+        node.color = new cc.Color(value.r, value.g, value.b, value.a !== undefined ? value.a : 255);
+      }
+      break;
+    }
+    case 'parent': {
+      var newParent = findNodeByPath(value);
+      if (!newParent) throw new Error('New parent not found: ' + value);
+      node.parent = newParent;
+      break;
+    }
+    default:
+      throw new Error('Unknown property: ' + property);
+  }
+}
+
+// ─── CC2.4.15 scene-script 正确格式 ───────────────────────────────────────────
+// 签名: function(event, opts)
+//   event.reply(err, result) — 将结果返回给 callSceneScript callback
+//   opts — 调用方传入的参数对象
 
 module.exports = {
 
-  // 查询节点树
-  getSceneTree(args, callback) {
+  getSceneTree: function(event, opts) {
     try {
-      const scene = cc.director.getScene();
-      callback(null, serializeNode(scene));
+      event.reply(null, serializeNode(cc.director.getScene()));
     } catch (e) {
-      callback(e.message);
+      event.reply(e.message);
     }
   },
 
-  // 创建节点
-  // args: { parentPath?, name, type? }
-  // type: 'Node' | 'Sprite' | 'Label' | 'Button' | 'Layout' | 'Widget'
-  createNode(args, callback) {
+  createNode: function(event, opts) {
     try {
-      const parent = (args.parentPath !== undefined && args.parentPath !== '')
+      var args = opts || {};
+      var parent = (args.parentPath !== undefined && args.parentPath !== '')
         ? findNodeByPath(args.parentPath)
         : cc.director.getScene();
+      if (!parent) { event.reply('Parent node not found: ' + args.parentPath); return; }
 
-      if (!parent) {
-        return callback('Parent node not found: ' + args.parentPath);
-      }
-
-      const node = new cc.Node(args.name || 'NewNode');
+      var node = new cc.Node(args.name || 'NewNode');
       parent.addChild(node);
 
-      const typeMap = {
-        'Sprite': cc.Sprite,
-        'Label':  cc.Label,
-        'Button': cc.Button,
-        'Layout': cc.Layout,
-        'Widget': cc.Widget,
-        'RichText': cc.RichText,
-        'EditBox': cc.EditBox,
-        'ScrollView': cc.ScrollView,
-        'Toggle': cc.Toggle,
-        'Slider': cc.Slider,
-        'ProgressBar': cc.ProgressBar,
+      var typeMap = {
+        'Sprite': cc.Sprite, 'Label': cc.Label, 'Button': cc.Button,
+        'Layout': cc.Layout, 'Widget': cc.Widget, 'RichText': cc.RichText,
+        'EditBox': cc.EditBox, 'ScrollView': cc.ScrollView, 'Toggle': cc.Toggle,
+        'Slider': cc.Slider, 'ProgressBar': cc.ProgressBar,
       };
-
       if (args.type && args.type !== 'Node' && typeMap[args.type]) {
         node.addComponent(typeMap[args.type]);
       }
-
-      callback(null, {
-        uuid: node.uuid,
-        name: node.name,
-        path: getNodePath(node),
-      });
+      event.reply(null, { uuid: node.uuid, name: node.name, path: getNodePath(node) });
     } catch (e) {
-      callback(e.message);
+      event.reply(e.message);
     }
   },
 
-  // 删除节点
-  // args: { nodePath? | nodeUuid? }
-  deleteNode(args, callback) {
+  deleteNode: function(event, opts) {
     try {
-      const node = findNodeByArgs(args);
-      if (!node) return callback('Node not found');
-      const name = node.name;
+      var node = findNodeByArgs(opts || {});
+      if (!node) { event.reply('Node not found'); return; }
+      var name = node.name;
       node.destroy();
-      callback(null, { ok: true, deleted: name });
+      event.reply(null, { ok: true, deleted: name });
     } catch (e) {
-      callback(e.message);
+      event.reply(e.message);
     }
   },
 
-  // 设置节点属性
-  // args: { nodePath? | nodeUuid?, property, value }
-  setNodeProperty(args, callback) {
+  setNodeProperty: function(event, opts) {
     try {
-      const node = findNodeByArgs(args);
-      if (!node) return callback('Node not found: ' + (args.nodePath || args.nodeUuid));
+      var args = opts || {};
+      var node = findNodeByArgs(args);
+      if (!node) { event.reply('Node not found: ' + (args.nodePath || args.nodeUuid)); return; }
+      applyProperty(node, args.property, args.value);
+      event.reply(null, { ok: true, nodeUuid: node.uuid, property: args.property, value: args.value });
+    } catch (e) {
+      event.reply(e.message);
+    }
+  },
 
-      const { property, value } = args;
-      switch (property) {
-        case 'x':       node.x = value; break;
-        case 'y':       node.y = value; break;
-        case 'width':   node.width = value; break;
-        case 'height':  node.height = value; break;
-        case 'name':    node.name = value; break;
-        case 'active':  node.active = value; break;
-        case 'angle':   node.angle = value; break;
-        case 'scaleX':  node.scaleX = value; break;
-        case 'scaleY':  node.scaleY = value; break;
-        case 'opacity': node.opacity = value; break;
-        case 'anchorX': node.anchorX = value; break;
-        case 'anchorY': node.anchorY = value; break;
-        case 'color': {
-          if (typeof value === 'string') {
-            node.color = hexToColor(value);
-          } else {
-            node.color = new cc.Color(value.r, value.g, value.b, value.a !== undefined ? value.a : 255);
-          }
-          break;
-        }
-        case 'zIndex': node.zIndex = value; break;
-        case 'parent': {
-          const newParent = findNodeByPath(value);
-          if (!newParent) return callback('New parent not found: ' + value);
-          node.parent = newParent;
-          break;
-        }
-        default:
-          return callback('Unknown property: ' + property);
+  setMultipleProps: function(event, opts) {
+    try {
+      var args = opts || {};
+      var node = findNodeByArgs(args);
+      if (!node) { event.reply('Node not found'); return; }
+      var props = args.props || {};
+      var keys = Object.keys(props);
+      for (var i = 0; i < keys.length; i++) {
+        applyProperty(node, keys[i], props[keys[i]]);
       }
-
-      callback(null, { ok: true, nodeUuid: node.uuid, property: property, value: value });
+      event.reply(null, { ok: true, nodeUuid: node.uuid, updatedProps: keys });
     } catch (e) {
-      callback(e.message);
+      event.reply(e.message);
     }
   },
 
-  // 批量设置属性
-  // args: { nodePath? | nodeUuid?, props: { property: value, ... } }
-  setMultipleProps(args, callback) {
+  addComponent: function(event, opts) {
     try {
-      const node = findNodeByArgs(args);
-      if (!node) return callback('Node not found');
-
-      const props = args.props || {};
-      const keys = Object.keys(props);
-      for (let i = 0; i < keys.length; i++) {
-        const property = keys[i];
-        const value = props[property];
-        switch (property) {
-          case 'x':       node.x = value; break;
-          case 'y':       node.y = value; break;
-          case 'width':   node.width = value; break;
-          case 'height':  node.height = value; break;
-          case 'name':    node.name = value; break;
-          case 'active':  node.active = value; break;
-          case 'angle':   node.angle = value; break;
-          case 'scaleX':  node.scaleX = value; break;
-          case 'scaleY':  node.scaleY = value; break;
-          case 'opacity': node.opacity = value; break;
-          case 'anchorX': node.anchorX = value; break;
-          case 'anchorY': node.anchorY = value; break;
-          case 'zIndex':  node.zIndex = value; break;
-          case 'color': {
-            if (typeof value === 'string') {
-              node.color = hexToColor(value);
-            } else {
-              node.color = new cc.Color(value.r, value.g, value.b, value.a !== undefined ? value.a : 255);
-            }
-            break;
-          }
-        }
-      }
-
-      callback(null, { ok: true, nodeUuid: node.uuid, updatedProps: keys });
-    } catch (e) {
-      callback(e.message);
-    }
-  },
-
-  // 添加组件
-  // args: { nodePath? | nodeUuid?, componentType }
-  addComponent(args, callback) {
-    try {
-      const node = findNodeByArgs(args);
-      if (!node) return callback('Node not found');
-
-      const compClass = resolveComponentClass(args.componentType);
-      if (!compClass) return callback('Component type not found: ' + args.componentType);
-
-      // 检查是否已经存在
+      var args = opts || {};
+      var node = findNodeByArgs(args);
+      if (!node) { event.reply('Node not found'); return; }
+      var compClass = resolveComponentClass(args.componentType);
+      if (!compClass) { event.reply('Component type not found: ' + args.componentType); return; }
       if (node.getComponent(compClass)) {
-        return callback(null, { ok: true, alreadyExists: true, componentType: args.componentType });
+        event.reply(null, { ok: true, alreadyExists: true, componentType: args.componentType });
+        return;
       }
-
-      const comp = node.addComponent(compClass);
-      callback(null, {
-        ok: true,
-        componentType: cc.js.getClassName(comp),
-      });
+      var comp = node.addComponent(compClass);
+      event.reply(null, { ok: true, componentType: cc.js.getClassName(comp) });
     } catch (e) {
-      callback(e.message);
+      event.reply(e.message);
     }
   },
 
-  // 设置组件引用属性（相当于拖拽赋值）
-  // args: {
-  //   nodePath? | nodeUuid?,
-  //   componentType,
-  //   property,
-  //   refType: 'node' | 'component' | 'asset',
-  //   refValue: nodePath or uuid,
-  //   refComponentType?,   // refType='component' 时使用
-  // }
-  setComponentRef(args, callback) {
+  setComponentRef: function(event, opts) {
     try {
-      const node = findNodeByArgs(args);
-      if (!node) return callback('Node not found: ' + (args.nodePath || args.nodeUuid));
+      var args = opts || {};
+      var node = findNodeByArgs(args);
+      if (!node) { event.reply('Node not found: ' + (args.nodePath || args.nodeUuid)); return; }
+      var compClass = resolveComponentClass(args.componentType);
+      if (!compClass) { event.reply('Component class not found: ' + args.componentType); return; }
+      var comp = node.getComponent(compClass);
+      if (!comp) { event.reply('Component ' + args.componentType + ' not found on node ' + node.name); return; }
 
-      const compClass = resolveComponentClass(args.componentType);
-      if (!compClass) return callback('Component class not found: ' + args.componentType);
-
-      const comp = node.getComponent(compClass);
-      if (!comp) return callback(`Component ${args.componentType} not found on node ${node.name}`);
-
-      const { property, refType, refValue, refComponentType } = args;
-
-      if (refType === 'node') {
-        const refNode = findNodeByPath(refValue) || findNodeByUuid(refValue);
-        if (!refNode) return callback('Reference node not found: ' + refValue);
-        comp[property] = refNode;
-        callback(null, { ok: true });
-
-      } else if (refType === 'component') {
-        const refNode = findNodeByPath(refValue) || findNodeByUuid(refValue);
-        if (!refNode) return callback('Reference node not found: ' + refValue);
-        const refCompClass = resolveComponentClass(refComponentType);
-        if (!refCompClass) return callback('Reference component class not found: ' + refComponentType);
-        const refComp = refNode.getComponent(refCompClass);
-        if (!refComp) return callback(`Component ${refComponentType} not found on reference node`);
-        comp[property] = refComp;
-        callback(null, { ok: true });
-
-      } else if (refType === 'asset') {
-        cc.loader.load({ uuid: refValue }, function(err, asset) {
-          if (err) return callback('Asset load failed: ' + err);
-          comp[property] = asset;
-          callback(null, { ok: true });
-        });
-
+      if (args.refType === 'node') {
+        var refNode = findNodeByPath(args.refValue) || findNodeByUuid(args.refValue);
+        if (!refNode) { event.reply('Reference node not found: ' + args.refValue); return; }
+        comp[args.property] = refNode;
+        event.reply(null, { ok: true });
+      } else if (args.refType === 'component') {
+        var refNode2 = findNodeByPath(args.refValue) || findNodeByUuid(args.refValue);
+        if (!refNode2) { event.reply('Reference node not found: ' + args.refValue); return; }
+        var refCompClass = resolveComponentClass(args.refComponentType);
+        if (!refCompClass) { event.reply('Reference component class not found: ' + args.refComponentType); return; }
+        var refComp = refNode2.getComponent(refCompClass);
+        if (!refComp) { event.reply('Component ' + args.refComponentType + ' not found on reference node'); return; }
+        comp[args.property] = refComp;
+        event.reply(null, { ok: true });
       } else {
-        callback('Unknown refType: ' + refType + '. Use: node | component | asset');
+        event.reply('Unknown refType: ' + args.refType);
       }
     } catch (e) {
-      callback(e.message);
+      event.reply(e.message);
     }
   },
 
-  // 查找节点
-  // args: { nodePath? | nodeUuid? }
-  findNode(args, callback) {
+  findNode: function(event, opts) {
     try {
-      const node = findNodeByArgs(args);
-      if (!node) return callback(null, { found: false });
-      callback(null, {
+      var node = findNodeByArgs(opts || {});
+      if (!node) { event.reply(null, { found: false }); return; }
+      event.reply(null, {
         found: true,
         uuid: node.uuid,
         name: node.name,
@@ -352,7 +271,7 @@ module.exports = {
         size: { w: node.width, h: node.height },
       });
     } catch (e) {
-      callback(e.message);
+      event.reply(e.message);
     }
   },
 };
