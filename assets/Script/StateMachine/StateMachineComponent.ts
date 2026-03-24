@@ -49,6 +49,13 @@ export default class StateMachineComponent extends cc.Component {
     /** 最后按下的横向方向：1 = 右，-1 = 左，0 = 未按过 */
     private _lastHorizDir: number = 0;
 
+    /**
+     * 预输入缓冲：记录最后一次按下的技能键及按下时的动画帧索引
+     * 若在当前帧窗口开放前的 preInputFrames 帧内按下，可在窗口开放时自动触发
+     * 按下其他技能键时立即清除
+     */
+    private _preInputBuffer: { action: string; pressedAtAnimFrame: number } | null = null;
+
     // ── 生命周期 ─────────────────────────────────────────────
     onLoad() {
         initKeyMap();
@@ -114,6 +121,9 @@ export default class StateMachineComponent extends cc.Component {
             }
             this._pendingInputs.length = 0;
         }
+
+        // 预输入缓冲：尝试触发之前缓冲的技能键
+        this._processPreInputBuffer();
 
         if (this._pendingReleases.length > 0) {
             for (const action of this._pendingReleases) {
@@ -229,6 +239,16 @@ export default class StateMachineComponent extends cc.Component {
         }
 
         this._pendingInputs.push(action);
+
+        // 预输入缓冲：仅记录技能键（非方向键）
+        if (this._isSkillKey(action)) {
+            if (this._preInputBuffer && this._preInputBuffer.action !== action) {
+                // 按下了不同技能键，清除预输入缓冲
+                this._preInputBuffer = null;
+            }
+            const currentFrame = this.animPlayer ? this.animPlayer.currentFrameIndex : 0;
+            this._preInputBuffer = { action, pressedAtAnimFrame: currentFrame };
+        }
     }
 
     private _onKeyUp(event: cc.Event.EventKeyboard) {
@@ -307,7 +327,8 @@ export default class StateMachineComponent extends cc.Component {
                      conditionType === ConditionType.OnInputRelease ||
                      conditionType === ConditionType.OnDoubleTap) &&
                     t.inputAction !== inputAction) continue;
-                if (!t.canInterrupt && conditionType !== ConditionType.OnAnimFinish) {
+                // canInsert=true 的转换可绕过 canInterrupt 检查，任意帧直接插入
+                if (!t.canInsert && !t.canInterrupt && conditionType !== ConditionType.OnAnimFinish) {
                     const animState = this._animStateMap.get(this._currentState);
                     if (animState && !animState.loop && this.animPlayer) continue;
                 }
@@ -327,8 +348,8 @@ export default class StateMachineComponent extends cc.Component {
      * 校验帧窗口 + 参数条件，全部通过才返回 true
      */
     private _checkExtraConditions(t: OutgoingTransition): boolean {
-        // 帧窗口检查
-        if (t.minFrame >= 0 || t.maxFrame >= 0) {
+        // 帧窗口检查（canInsert=true 时跳过，允许任意帧触发）
+        if (!t.canInsert && (t.minFrame >= 0 || t.maxFrame >= 0)) {
             const frame = this.animPlayer ? this.animPlayer.currentFrameIndex : 0;
             if (t.minFrame >= 0 && frame < t.minFrame) return false;
             if (t.maxFrame >= 0 && frame > t.maxFrame) return false;
@@ -366,6 +387,9 @@ export default class StateMachineComponent extends cc.Component {
         const prevState = this._currentState;
         this._currentState = stateName;
 
+        // 状态切换时清除预输入缓冲（旧状态的缓冲在新状态中无意义）
+        this._preInputBuffer = null;
+
         // 播放对应动画
         const animState = this._animStateMap.get(stateName);
         if (animState && this.animPlayer) {
@@ -389,11 +413,84 @@ export default class StateMachineComponent extends cc.Component {
 
         // 检查进入新状态后是否有 Immediate 转换
         this._tryTransition(ConditionType.Immediate, null);
+
+        // Immediate 未触发切换时，补发当前仍按住的方向键
+        // 确保技能/攻击结束回到待机状态时，若方向键仍按住能立即恢复移动
+        if (this._currentState === stateName) {
+            const dirKeys = ['Left', 'Right', 'Up', 'Down', 'W', 'S'];
+            for (const dir of dirKeys) {
+                if (this._heldKeys.has(dir)) {
+                    this._tryTransition(ConditionType.OnInput, dir);
+                    // 已发生状态切换，由新状态的 _enterState 继续处理
+                    if (this._currentState !== stateName) break;
+                }
+            }
+        }
     }
 
     private _isCurrentStateLockFacing(): boolean {
         const animState = this._animStateMap.get(this._currentState);
         return animState ? animState.lockFacing : false;
+    }
+
+    /**
+     * 判断是否为技能键（非方向键）
+     * 方向键：Left / Right / Up / Down / W / S
+     * 技能键：X / Z / C / V / Space / A / D 等
+     */
+    private _isSkillKey(action: string): boolean {
+        return action !== 'Left' && action !== 'Right' &&
+               action !== 'Up'  && action !== 'Down'  &&
+               action !== 'W'   && action !== 'S';
+    }
+
+    /**
+     * 预输入缓冲处理：尝试将缓冲的技能键输入重放给当前状态的转换
+     *
+     * 工作原理：
+     *   - 按下技能键时，同步记录到 _preInputBuffer（含按下时的动画帧）
+     *   - 每帧检查各条 OnInput 转换的 preInputFrames：
+     *     只要有至少一条匹配转换仍在其预输入窗口内，就继续尝试触发
+     *   - 所有匹配转换均已超出各自的 preInputFrames 时，缓冲过期并清除
+     *   - 状态切换（_enterState）或按下其他技能键时立即清除缓冲
+     */
+    private _processPreInputBuffer() {
+        if (!this._preInputBuffer || !this._config) return;
+
+        const currentFrame = this.animPlayer ? this.animPlayer.currentFrameIndex : 0;
+        const animFrameDiff = currentFrame - this._preInputBuffer.pressedAtAnimFrame;
+
+        // 动画帧未推进（仍在同一帧），pendingInputs 本帧已处理过，跳过
+        if (animFrameDiff <= 0) return;
+
+        // 检查是否有至少一条匹配转换还在预输入窗口内
+        const action = this._preInputBuffer.action;
+        const stateCfg = this._findStateCfg(this._currentState);
+        const lists = [
+            stateCfg ? stateCfg.transitions : [],
+            this._config.globalTransitions,
+        ];
+        let hasValidWindow = false;
+        for (const list of lists) {
+            for (const t of list) {
+                if (t.conditionType === ConditionType.OnInput &&
+                    t.inputAction === action &&
+                    t.preInputFrames > 0 &&
+                    animFrameDiff <= t.preInputFrames) {
+                    hasValidWindow = true;
+                    break;
+                }
+            }
+            if (hasValidWindow) break;
+        }
+
+        if (!hasValidWindow) {
+            this._preInputBuffer = null;
+            return;
+        }
+
+        // 尝试触发缓冲的输入；若转换成功，_enterState 会清除 _preInputBuffer
+        this._tryTransition(ConditionType.OnInput, action);
     }
 
     // ── 公共接口 ─────────────────────────────────────────────

@@ -90,8 +90,19 @@ export class OutgoingTransition {
     canInterrupt: boolean = true;
 
     /**
+     * 是否为插入技能（优先级高于 canInterrupt 和帧窗口限制）
+     * true：可在任意帧直接打断当前动画并跳转，忽略 minFrame/maxFrame 约束
+     * false：遵守正常的 canInterrupt + 帧窗口规则
+     *
+     * 用途示例：S 技能可随时插入当前普攻动画，而 X 普攻只能在指定帧窗口内续接
+     */
+    @property
+    canInsert: boolean = false;
+
+    /**
      * 允许触发的最小帧索引（含），-1 表示不限
      * 例：minFrame=5 表示当前动画播到第 5 帧后才允许触发此转换
+     * canInsert=true 时忽略此项
      */
     @property
     minFrame: number = -1;
@@ -99,9 +110,22 @@ export class OutgoingTransition {
     /**
      * 允许触发的最大帧索引（含），-1 表示不限
      * 与 minFrame 组合使用可定义"帧窗口"
+     * canInsert=true 时忽略此项
      */
     @property
     maxFrame: number = -1;
+
+    /**
+     * 预输入缓冲帧数（动画帧，0 = 关闭预输入）
+     * 仅对 conditionType = OnInput 的转换生效。
+     * 按下对应技能键后，若 minFrame 尚未到达，系统会保留该输入最多 preInputFrames 个动画帧；
+     * 期间一旦 minFrame 开放则自动触发此转换。
+     * 按下其他技能键会立即清除预输入缓冲。
+     *
+     * 示例：preInputFrames=3，玩家在 minFrame 前 3 帧内按键，均视为有效输入
+     */
+    @property
+    preInputFrames: number = 0;
 
     /**
      * 参数条件列表，所有条件同时满足时转换才生效
