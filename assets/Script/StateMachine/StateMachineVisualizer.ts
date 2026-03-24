@@ -14,6 +14,8 @@
 
 import StateMachineComponent from "./StateMachineComponent";
 import StateMachineConfig, { ConditionType, OutgoingTransition, StateNodeConfig } from "./StateMachineConfig";
+import BattleSystem from "../Battle/BattleSystem";
+import { SkillBoxShape } from "../Battle/SkillBox";
 
 const { ccclass, property } = cc._decorator;
 
@@ -26,6 +28,22 @@ export default class StateMachineVisualizer extends cc.Component {
 
     @property(StateMachineComponent)
     targetStateMachine: StateMachineComponent = null;
+
+    /**
+     * 斜投影比例，须与 PlayerController.perspectiveRatio 保持一致
+     * 用于将 worldZ（深度）映射到屏幕 Y，从而正确定位 SkillBox 边框
+     */
+    @property
+    perspectiveRatio: number = 0.5;
+
+    /**
+     * 深度可视化 X 系数（仅影响 SkillBox 边框绘制，不影响游戏逻辑）
+     * 给深度方向附加一个水平偏移，使近面/远面产生横向位移，形成斜等测投影效果
+     * 0 = 纯 Y 轴偏移（深度边为垂直线，视觉上扁平）
+     * 0.3 = 近面右偏、远面左偏，深度边呈斜线，立体感明显
+     */
+    @property
+    depthXRatio: number = 0.3;
 
     private _graphics: cc.Graphics = null;
     private _labelNodes: cc.Node[] = [];    // 每帧重建，统一管理
@@ -40,8 +58,23 @@ export default class StateMachineVisualizer extends cc.Component {
     private _nextRadius: number = 20;   // 下一状态节点半径
     private _prevRadius: number = 16;   // 上一状态节点半径
 
+    /** SkillBox 边框绘制（Visualizer 子节点，Canvas 坐标对齐） */
+    private _boxGraphics: cc.Graphics = null;
+    /** 玩家中心 Debug 球（玩家节点子节点，渲染在玩家精灵之上） */
+    private _sphereGraphics: cc.Graphics = null;
+
+    /** Debug 模式开关（O 键切换） */
+    private _debugEnabled: boolean = true;
+    private _oKeyDown: boolean = false;
+
     onLoad() {
         this._graphics = this.node.addComponent(cc.Graphics);
+
+        // SkillBox Debug 独立子节点，挂在 Visualizer 下，渲染顺序在 TestPlayer 之后。
+        // 每帧抵消 Visualizer 的偏移，使子节点对齐 Canvas (0,0)，直接用 Canvas 本地坐标绘制。
+        const boxNode = new cc.Node("SkillBoxDebug");
+        this._boxGraphics = boxNode.addComponent(cc.Graphics);
+        this.node.addChild(boxNode);
 
         if (!this.targetStateMachine) {
             cc.warn("[Viz] targetStateMachine 未赋值");
@@ -50,11 +83,45 @@ export default class StateMachineVisualizer extends cc.Component {
 
         this.targetStateMachine.node.on("state-changed", this._onStateChanged, this);
         this.schedule(this._tryInit, 0.2);
+        cc.systemEvent.on(cc.SystemEvent.EventType.KEY_DOWN, this._onKeyDown, this);
+        cc.systemEvent.on(cc.SystemEvent.EventType.KEY_UP,   this._onKeyUp,   this);
     }
 
     onDestroy() {
         if (this.targetStateMachine) {
             this.targetStateMachine.node.off("state-changed", this._onStateChanged, this);
+        }
+        cc.systemEvent.off(cc.SystemEvent.EventType.KEY_DOWN, this._onKeyDown, this);
+        cc.systemEvent.off(cc.SystemEvent.EventType.KEY_UP,   this._onKeyUp,   this);
+    }
+
+    update(_dt: number) {
+        if (this._boxGraphics && cc.isValid(this._boxGraphics.node)) {
+            this._boxGraphics.node.setPosition(-this.node.x, -this.node.y);
+        }
+
+        if (this._debugEnabled) {
+            this._drawSkillBoxes();
+        } else {
+            // 关闭时清空两个画布
+            if (this._boxGraphics)    this._boxGraphics.clear();
+            if (this._sphereGraphics) this._sphereGraphics.clear();
+        }
+    }
+
+    private _onKeyDown(e: cc.Event.EventKeyboard) {
+        if (e.keyCode === cc.macro.KEY.o) {
+            if (!this._oKeyDown) {
+                this._oKeyDown = true;
+                this._debugEnabled = !this._debugEnabled;
+                cc.log(`[Viz] Debug ${this._debugEnabled ? "ON" : "OFF"}`);
+            }
+        }
+    }
+
+    private _onKeyUp(e: cc.Event.EventKeyboard) {
+        if (e.keyCode === cc.macro.KEY.o) {
+            this._oKeyDown = false;
         }
     }
 
@@ -66,6 +133,13 @@ export default class StateMachineVisualizer extends cc.Component {
         this._setupArea();
         this._currentState = this.targetStateMachine.getCurrentState();
         this._fullRedraw();
+
+        // 小球挂在玩家节点下：玩家自身 Sprite 先渲染，子节点后渲染，保证在精灵之上
+        if (!this._sphereGraphics) {
+            const sn = new cc.Node("PlayerDebugSphere");
+            this._sphereGraphics = sn.addComponent(cc.Graphics);
+            this.targetStateMachine.node.addChild(sn);
+        }
     }
 
     private _onStateChanged(data: { from: string; to: string }) {
@@ -229,14 +303,130 @@ export default class StateMachineVisualizer extends cc.Component {
         );
     }
 
-    // ── 布局计算 ──────────────────────────────────────────────
+    // ── SkillBox 边框绘制 ─────────────────────────────────────
 
-    private _findStateCfg(config: StateMachineConfig, stateName: string): StateNodeConfig | null {
-        for (let i = 0; i < config.states.length; i++) {
-            if (config.states[i].stateName === stateName) return config.states[i];
+    /**
+     * 每帧重绘所有活跃 SkillBox 的边框
+     *
+     * 坐标系：Canvas 本地坐标（原点 = 屏幕中心）
+     *   screenX = worldX
+     *   screenY = worldY + worldZ × perspectiveRatio
+     *
+     * Box 绘制策略：画前面、后面（深度偏移）、四条连接边，形成透视线框效果
+     * Sphere 绘制策略：画椭圆（水平半径 = radius，竖直半径 = radius × perspectiveRatio）
+     */
+    private _drawSkillBoxes() {
+        const g = this._boxGraphics;
+        if (!g) return;
+        g.clear();
+
+        // 玩家 Debug 球：在玩家子节点上绘制，坐标为玩家本地(0,0)即锚点位置
+        if (this._sphereGraphics && cc.isValid(this._sphereGraphics.node)) {
+            const sg = this._sphereGraphics;
+            sg.clear();
+            sg.strokeColor = cc.color(80, 255, 255, 255);
+            sg.fillColor   = cc.color(80, 255, 255, 180);
+            sg.lineWidth = 2;
+            sg.circle(0, 0, 6);
+            sg.fill();
+            sg.circle(0, 0, 6);
+            sg.stroke();
+            sg.strokeColor = cc.color(80, 255, 255, 200);
+            sg.lineWidth = 1;
+            sg.moveTo(-12, 0); sg.lineTo(12, 0);
+            sg.moveTo(0, -12); sg.lineTo(0, 12);
+            sg.stroke();
         }
-        return null;
+
+        const battle = BattleSystem.instance;
+        if (!battle) return;
+
+        const boxes = battle.getActiveBoxes();
+        if (boxes.length === 0) return;
+
+        const ratio = this.perspectiveRatio;
+
+        for (let i = 0; i < boxes.length; i++) {
+            const box = boxes[i];
+
+            // 盒子中心直接用 Canvas 本地坐标
+            const cx = box.worldX;
+            const cy = box.worldY + box.worldZ * ratio;
+
+            if (box.shapeType === SkillBoxShape.Sphere) {
+                // 球体：椭圆（深度压缩竖轴）
+                g.strokeColor = cc.color(255, 80, 80, 220);
+                g.lineWidth = 2;
+                g.ellipse(cx, cy, box.radius * 2, box.radius * 2 * ratio || box.radius * 2);
+                g.stroke();
+                // 十字辅助线
+                g.strokeColor = cc.color(255, 80, 80, 100);
+                g.lineWidth = 1;
+                g.moveTo(cx - box.radius, cy);
+                g.lineTo(cx + box.radius, cy);
+                g.moveTo(cx, cy - box.radius);
+                g.lineTo(cx, cy + box.radius);
+                g.stroke();
+            } else {
+                // 长方体：斜等测投影（cabinet oblique）
+                //   Z 轴在屏幕上映射为：Y 方向 perspectiveRatio，X 方向 depthXRatio
+                //   近面（低 Z）相对盒子中心：右偏 +halfDx、下偏 -halfDz
+                //   远面（高 Z）相对盒子中心：左偏 -halfDx、上偏 +halfDz
+                const hw     = box.sizeX * 0.5;
+                const hh     = box.sizeY * 0.5;
+                const halfDz = box.sizeZ * ratio            * 0.5;
+                const halfDx = box.sizeZ * this.depthXRatio * 0.5;
+
+                // 近面（near face）中心
+                const ncx = cx + halfDx;
+                const ncy = cy - halfDz;
+                // 远面（far face）中心
+                const fcx = cx - halfDx;
+                const fcy = cy + halfDz;
+
+                // 近面四角
+                const nl = ncx - hw;  const nr = ncx + hw;
+                const nb = ncy - hh;  const nt = ncy + hh;
+                // 远面四角
+                const fl = fcx - hw;  const fr = fcx + hw;
+                const fb = fcy - hh;  const ft = fcy + hh;
+
+                // ① 远面（先画）
+                g.strokeColor = cc.color(255, 100, 100, 190);
+                g.lineWidth = 1.5;
+                g.moveTo(fl, fb); g.lineTo(fr, fb);
+                g.lineTo(fr, ft); g.lineTo(fl, ft);
+                g.lineTo(fl, fb);
+                g.stroke();
+
+                // ② 四条深度斜边
+                g.strokeColor = cc.color(255, 140, 80, 200);
+                g.lineWidth = 1;
+                g.moveTo(nl, nb); g.lineTo(fl, fb);
+                g.moveTo(nr, nb); g.lineTo(fr, fb);
+                g.moveTo(nl, nt); g.lineTo(fl, ft);
+                g.moveTo(nr, nt); g.lineTo(fr, ft);
+                g.stroke();
+
+                // ③ 近面（最亮，最后画）
+                g.strokeColor = cc.color(255, 80, 80, 240);
+                g.lineWidth = 2;
+                g.moveTo(nl, nb); g.lineTo(nr, nb);
+                g.lineTo(nr, nt); g.lineTo(nl, nt);
+                g.lineTo(nl, nb);
+                g.stroke();
+
+                // ④ 中心十字辅助线
+                g.strokeColor = cc.color(255, 80, 80, 70);
+                g.lineWidth = 1;
+                g.moveTo(ncx, ncy - hh); g.lineTo(fcx, fcy + hh);
+                g.moveTo(nl, ncy);       g.lineTo(nr, ncy);
+                g.stroke();
+            }
+        }
     }
+
+    // ── 布局计算 ──────────────────────────────────────────────
 
     private _buildLayout(config: StateMachineConfig): {
         curPos: Pos;
@@ -252,7 +442,7 @@ export default class StateMachineVisualizer extends cc.Component {
         const bestMap: { [toState: string]: OutgoingTransition } = {};
         const isGlobalMap: { [toState: string]: boolean } = {};
 
-        const stateCfg = this._findStateCfg(config, this._currentState);
+        const stateCfg = config.findState(this._currentState);
         const localList = stateCfg ? stateCfg.transitions : [];
         const globalList = config.globalTransitions;
 

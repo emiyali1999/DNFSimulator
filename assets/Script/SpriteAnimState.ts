@@ -1,4 +1,69 @@
+import { SkillBoxShape } from "./Battle/SkillBox";
+
 const { ccclass, property } = cc._decorator;
+
+/**
+ * 技能盒子帧生成配置
+ * 在 SpriteAnimState.spawnConfigs 中填写，指定在哪一帧生成什么形状的技能盒子
+ */
+@ccclass("SkillBoxSpawnConfig")
+export class SkillBoxSpawnConfig {
+    /** 触发生成的本地帧索引（从 0 开始，对应动画播放到第几帧时生成） */
+    @property
+    frame: number = 0;
+
+    /** 形状类型：0 = 长方体，1 = 球体 */
+    @property({ type: cc.Enum(SkillBoxShape) })
+    shapeType: SkillBoxShape = SkillBoxShape.Box;
+
+    /** 长方体全长（X 轴，水平） */
+    @property
+    sizeX: number = 100;
+
+    /** 长方体全高（Y 轴，高度） */
+    @property
+    sizeY: number = 100;
+
+    /** 长方体全深（Z 轴，深度） */
+    @property
+    sizeZ: number = 100;
+
+    /** 球体半径（shapeType = Sphere 时生效） */
+    @property
+    radius: number = 50;
+
+    /**
+     * 相对创建者的世界坐标偏移（X 轴随朝向自动翻转）
+     * offsetX > 0 表示在角色面朝方向前方
+     */
+    @property
+    offsetX: number = 0;
+
+    /** 高度偏移（相对地面，地面 = 0） */
+    @property
+    offsetY: number = 0;
+
+    /** 深度偏移（正值 = 向远处） */
+    @property
+    offsetZ: number = 0;
+
+    /**
+     * 存活时长（秒），-1 表示无时间限制
+     * 配合 destroyOnStateChange 使用：
+     *   duration=-1 + destroyOnStateChange=true  → 随状态结束销毁（普通攻击判定帧）
+     *   duration=0.5 + destroyOnStateChange=false → 存活 0.5 秒后消失（弹体、余波）
+     */
+    @property
+    duration: number = -1;
+
+    /**
+     * 是否在创建者状态切换时销毁
+     * true  — 跟随状态生命周期（默认，适合普通攻击判定帧）
+     * false — 独立存活直到 duration 到期（弹体、陷阱等）
+     */
+    @property
+    destroyOnStateChange: boolean = true;
+}
 
 /**
  * 单帧偏移数据
@@ -80,7 +145,7 @@ export default class SpriteAnimState extends cc.Component {
      * 空数组 = 所有帧均可移动（默认）
      * 例如 [0] = 只有第一帧可以移动
      */
-    @property([Number])
+    @property([cc.Integer])
     moveFrames: number[] = [];
 
     /**
@@ -112,6 +177,14 @@ export default class SpriteAnimState extends cc.Component {
      */
     @property
     launchHorizSpeed: number = 0;
+
+    /**
+     * 技能盒子帧生成列表
+     * 每一项指定在哪一帧生成什么形状的判定盒子
+     * 同一帧可配置多项（多段判定区域）
+     */
+    @property([SkillBoxSpawnConfig])
+    spawnConfigs: SkillBoxSpawnConfig[] = [];
 
     // ── 运行时缓存 ────────────────────────────────────────────
     private _frames: cc.SpriteFrame[] = null;

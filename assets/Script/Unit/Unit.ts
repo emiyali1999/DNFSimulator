@@ -31,6 +31,10 @@ export default class Unit extends cc.Component {
         const system = UnitSystem.instance;
         if (system) {
             this._unitId = system.registerUnit(this);
+            // 将 unitId 写入状态机，供技能盒子生成时标记创建者
+            if (this.stateMachine) {
+                this.stateMachine.creatorId = this._unitId;
+            }
         } else {
             cc.warn("[Unit] 未找到 UnitSystem，请确保场景中有 UnitSystem 节点");
         }
@@ -43,13 +47,4 @@ export default class Unit extends cc.Component {
         }
     }
 
-    /** 单位在 UnitSystem 中的唯一 ID */
-    get unitId(): number {
-        return this._unitId;
-    }
-
-    /** 获取当前状态名（快捷访问） */
-    getCurrentState(): string {
-        return this.stateMachine ? this.stateMachine.getCurrentState() : "";
-    }
 }

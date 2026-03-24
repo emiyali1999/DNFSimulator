@@ -60,6 +60,9 @@ export default class PlayerController extends cc.Component {
     private _velX: number = 0;
     private _isOnGround: boolean = true;
 
+    get worldY(): number { return this._worldY; }
+    get worldZ(): number { return this._worldZ; }
+
     /** 方向输入：x = 左右，y = 深度（上下键） */
     private _moveDir: cc.Vec2 = cc.v2(0, 0);
     private _heldKeys: Set<number> = new Set();
@@ -149,10 +152,10 @@ export default class PlayerController extends cc.Component {
                 this.stateMachine.forceChangeState("SwordMan_StandBattle");
                 // 落地后同帧补发仍按住的方向键，让状态机立刻切换到 Walk
                 const k = cc.macro.KEY;
-                if (this._heldKeys.has(k.left)  || this._heldKeys.has(k.a))  this.stateMachine.triggerInputImmediate('Left');
-                if (this._heldKeys.has(k.right) || this._heldKeys.has(k.d))  this.stateMachine.triggerInputImmediate('Right');
-                if (this._heldKeys.has(k.up)    || this._heldKeys.has(k.w))  this.stateMachine.triggerInputImmediate('Up');
-                if (this._heldKeys.has(k.down)  || this._heldKeys.has(k.s))  this.stateMachine.triggerInputImmediate('Down');
+                if (this._heldKeys.has(k.left))  this.stateMachine.triggerInputImmediate('Left');
+                if (this._heldKeys.has(k.right)) this.stateMachine.triggerInputImmediate('Right');
+                if (this._heldKeys.has(k.up))    this.stateMachine.triggerInputImmediate('Up');
+                if (this._heldKeys.has(k.down))  this.stateMachine.triggerInputImmediate('Down');
             }
         }
     }
@@ -236,15 +239,4 @@ export default class PlayerController extends cc.Component {
         }
     }
 
-    // ── 公共接口 ─────────────────────────────────────────────
-
-    /** 获取当前世界坐标 */
-    getWorldPos(): { x: number; y: number; z: number } {
-        return { x: this._worldX, y: this._worldY, z: this._worldZ };
-    }
-
-    /** 是否在地面上 */
-    isOnGround(): boolean {
-        return this._isOnGround;
-    }
 }

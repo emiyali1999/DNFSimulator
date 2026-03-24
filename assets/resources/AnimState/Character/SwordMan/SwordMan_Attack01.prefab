@@ -119,7 +119,12 @@
     "lockFacing": true,
     "alignFacingOnEnter": true,
     "onlyFacingDir": true,
-    "_id": ""
+    "_id": "",
+    "spawnConfigs": [
+      {
+        "__id__": 11
+      }
+    ]
   },
   {
     "__type__": "FrameOffset",
@@ -187,5 +192,19 @@
     },
     "fileId": "",
     "sync": false
+  },
+  {
+    "__type__": "SkillBoxSpawnConfig",
+    "frame": 2,
+    "shapeType": 0,
+    "sizeX": 160,
+    "sizeY": 140,
+    "sizeZ": 100,
+    "offsetX": 130,
+    "offsetY": 60,
+    "offsetZ": 0,
+    "radius": 50,
+    "duration": -1,
+    "destroyOnStateChange": true
   }
 ]

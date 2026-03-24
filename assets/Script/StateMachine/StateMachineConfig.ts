@@ -199,4 +199,12 @@ export default class StateMachineConfig extends cc.Component {
      */
     @property([OutgoingTransition])
     globalTransitions: OutgoingTransition[] = [];
+
+    /** 按状态名查找配置节点 */
+    findState(stateName: string): StateNodeConfig | null {
+        for (let i = 0; i < this.states.length; i++) {
+            if (this.states[i].stateName === stateName) return this.states[i];
+        }
+        return null;
+    }
 }

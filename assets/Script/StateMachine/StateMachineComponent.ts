@@ -7,10 +7,11 @@
  *   - 驱动 SpriteAnimPlayer 播放对应动画
  */
 
-import StateMachineConfig, { ConditionType, CompareOp, OutgoingTransition, StateNodeConfig } from "./StateMachineConfig";
+import StateMachineConfig, { ConditionType, OutgoingTransition, StateNodeConfig } from "./StateMachineConfig";
 import SpriteAnimPlayer from "../SpriteAnimPlayer";
 import SpriteAnimState from "../SpriteAnimState";
 import { initKeyMap, KEY_ACTION_MAP } from "./InputAction";
+import BattleSystem from "../Battle/BattleSystem";
 
 const { ccclass, property } = cc._decorator;
 
@@ -31,8 +32,14 @@ export default class StateMachineComponent extends cc.Component {
     private _animStateMap: Map<string, SpriteAnimState> = new Map();
     private _loaded: boolean = false;
 
-    /** 角色参数表，外部通过 setParameter / getParameter 读写 */
-    private _params: { [key: string]: number } = {};
+    /**
+     * 创建者单位 ID，由 Unit.onLoad 写入，供技能盒子生成时使用
+     * -1 表示未关联单位（独立使用状态机时）
+     */
+    creatorId: number = -1;
+
+    /** 上一帧检测到的动画帧索引，用于逐帧检测技能盒子生成时机 */
+    private _lastAnimFrame: number = -1;
 
     /** 当前帧待处理的输入动作队列 */
     private _pendingInputs: string[] = [];
@@ -175,6 +182,8 @@ export default class StateMachineComponent extends cc.Component {
             }
             this._pendingReleases.length = 0;
         }
+
+        this._checkSkillBoxSpawns();
     }
 
     // ── 私有方法 ─────────────────────────────────────────────
@@ -355,7 +364,7 @@ export default class StateMachineComponent extends cc.Component {
         let best: OutgoingTransition = null;
 
         // 当前状态的出向转换
-        const stateCfg = this._findStateCfg(this._currentState);
+        const stateCfg = this._config.findState(this._currentState);
         const localList = stateCfg ? stateCfg.transitions : [];
 
         // 全局转换（任意状态均可触发）
@@ -413,7 +422,7 @@ export default class StateMachineComponent extends cc.Component {
     }
 
     /**
-     * 校验帧窗口 + 参数条件，全部通过才返回 true
+     * 校验帧窗口，通过返回 true
      */
     private _checkExtraConditions(t: OutgoingTransition): boolean {
         // 帧窗口检查（canInsert=true 时跳过，允许任意帧触发）
@@ -422,31 +431,7 @@ export default class StateMachineComponent extends cc.Component {
             if (t.minFrame >= 0 && frame < t.minFrame) return false;
             if (t.maxFrame >= 0 && frame > t.maxFrame) return false;
         }
-
-        // 参数条件检查（所有条件须同时满足）
-        for (let i = 0; i < t.conditions.length; i++) {
-            const c = t.conditions[i];
-            const actual = this._params[c.paramName] !== undefined ? this._params[c.paramName] : 0;
-            let pass = false;
-            switch (c.compareOp) {
-                case CompareOp.Equal:          pass = actual === c.value; break;
-                case CompareOp.NotEqual:       pass = actual !== c.value; break;
-                case CompareOp.Greater:        pass = actual >   c.value; break;
-                case CompareOp.GreaterOrEqual: pass = actual >=  c.value; break;
-                case CompareOp.Less:           pass = actual <   c.value; break;
-                case CompareOp.LessOrEqual:    pass = actual <=  c.value; break;
-            }
-            if (!pass) return false;
-        }
         return true;
-    }
-
-    private _findStateCfg(stateName: string): StateNodeConfig | null {
-        const states = this._config.states;
-        for (let i = 0; i < states.length; i++) {
-            if (states[i].stateName === stateName) return states[i];
-        }
-        return null;
     }
 
     private _enterState(stateName: string) {
@@ -457,6 +442,12 @@ export default class StateMachineComponent extends cc.Component {
 
         // 状态切换时清除预输入缓冲（旧状态的缓冲在新状态中无意义）
         this._preInputBuffer = null;
+
+        // 通知 BattleSystem 销毁该创建者所有绑定状态的技能盒子
+        BattleSystem.instance?.notifyStateChange(this.creatorId);
+
+        // 重置帧追踪，确保新状态第 0 帧也能触发生成
+        this._lastAnimFrame = -1;
 
         // 播放对应动画
         const animState = this._animStateMap.get(stateName);
@@ -508,6 +499,36 @@ export default class StateMachineComponent extends cc.Component {
     }
 
     /**
+     * 每帧检测动画帧是否推进，若推进则检查当前帧是否有配置技能盒子生成
+     * 同一帧索引只触发一次（_lastAnimFrame 防重）
+     */
+    private _checkSkillBoxSpawns() {
+        if (!this.animPlayer || !this._loaded) return;
+
+        const frame = this.animPlayer.currentFrameIndex;
+        if (frame === this._lastAnimFrame) return;
+        this._lastAnimFrame = frame;
+
+        const animState = this._animStateMap.get(this._currentState);
+        if (!animState || animState.spawnConfigs.length === 0) return;
+
+        const battle = BattleSystem.instance;
+        if (!battle) return;
+
+        // 通过鸭子类型获取创建者当前的三维坐标（避免对 PlayerController 的硬依赖）
+        const pc = this.node.getComponent('PlayerController') as any;
+        const creatorWorldY: number = pc ? (pc.worldY as number) : 0;
+        const creatorWorldZ: number = pc ? (pc.worldZ as number) : 0;
+
+        for (let i = 0; i < animState.spawnConfigs.length; i++) {
+            const cfg = animState.spawnConfigs[i];
+            if (cfg.frame === frame) {
+                battle.spawnBox(cfg, this.node, this.creatorId, creatorWorldY, creatorWorldZ);
+            }
+        }
+    }
+
+    /**
      * 判断是否为技能键（非方向键）
      * 方向键：Left / Right / Up / Down / W / S
      * 技能键：X / Z / C / V / Space / A / D 等
@@ -538,7 +559,7 @@ export default class StateMachineComponent extends cc.Component {
 
         // 检查是否有至少一条匹配转换还在预输入窗口内
         const action = this._preInputBuffer.action;
-        const stateCfg = this._findStateCfg(this._currentState);
+        const stateCfg = this._config.findState(this._currentState);
         const lists = [
             stateCfg ? stateCfg.transitions : [],
             this._config.globalTransitions,
@@ -589,15 +610,6 @@ export default class StateMachineComponent extends cc.Component {
     }
 
     /**
-     * 手动触发输入动作（队列方式，下一帧处理）
-     */
-    triggerInput(action: string) {
-        if (this._loaded) {
-            this._pendingInputs.push(action);
-        }
-    }
-
-    /**
      * 立即（同帧）触发输入动作，用于落地等需要即时响应的场景
      */
     triggerInputImmediate(action: string) {
@@ -620,19 +632,4 @@ export default class StateMachineComponent extends cc.Component {
         return this._animStateMap.get(stateName) ?? null;
     }
 
-    /**
-     * 设置角色参数，供转换条件检查使用
-     * @param key   参数名，与 ParameterCondition.paramName 对应
-     * @param value 数值（未设置过的参数默认视为 0）
-     */
-    setParameter(key: string, value: number) {
-        this._params[key] = value;
-    }
-
-    /**
-     * 读取角色参数（未设置过返回 0）
-     */
-    getParameter(key: string): number {
-        return this._params[key] !== undefined ? this._params[key] : 0;
-    }
 }
