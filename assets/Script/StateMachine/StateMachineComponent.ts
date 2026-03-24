@@ -40,6 +40,8 @@ export default class StateMachineComponent extends cc.Component {
     private _pendingReleases: string[] = [];
     /** 当前帧待处理的双击队列 */
     private _pendingDoubleTaps: string[] = [];
+    /** 当前帧待处理的组合键队列（手搓招式） */
+    private _pendingCombos: string[] = [];
     /** 各动作上次按下的时间戳（秒），用于双击检测 */
     private _lastTapTime: { [key: string]: number } = {};
     /** 双击判定时间窗口（秒） */
@@ -48,6 +50,10 @@ export default class StateMachineComponent extends cc.Component {
     private _heldKeys: Set<string> = new Set();
     /** 最后按下的横向方向：1 = 右，-1 = 左，0 = 未按过 */
     private _lastHorizDir: number = 0;
+    /** 当前正在执行的转换所对应的输入动作，用于防止 _enterState 补发时重放触发键 */
+    private _activeTransitionAction: string | null = null;
+    /** 当前是否处于 _onAnimFinished 回调中，用于允许 canInterrupt=false 的 OnInputHeld 在动画结束时触发 */
+    private _inAnimFinished: boolean = false;
 
     /**
      * 预输入缓冲：记录最后一次按下的技能键及按下时的动画帧索引
@@ -100,6 +106,20 @@ export default class StateMachineComponent extends cc.Component {
     update(_dt: number) {
         if (!this._loaded) return;
 
+        // 组合键（手搓招式）最优先处理，触发后消费对应 OnInput
+        if (this._pendingCombos.length > 0) {
+            const comboSet = new Set(this._pendingCombos);
+            const stateBefore = this._currentState;
+            for (const action of this._pendingCombos) {
+                this._tryTransition(ConditionType.OnCombo, action);
+                if (this._currentState !== stateBefore) break;
+            }
+            if (this._currentState !== stateBefore) {
+                this._pendingInputs = this._pendingInputs.filter(a => !comboSet.has(a));
+            }
+            this._pendingCombos.length = 0;
+        }
+
         // 双击优先处理，避免被单击覆盖
         if (this._pendingDoubleTaps.length > 0) {
             const doubleTapSet = new Set(this._pendingDoubleTaps);
@@ -125,6 +145,13 @@ export default class StateMachineComponent extends cc.Component {
         // 预输入缓冲：尝试触发之前缓冲的技能键
         this._processPreInputBuffer();
 
+        // 持续按住检测（OnInputHeld）：按住键时每帧检查，满足帧窗口自动触发
+        if (this._heldKeys.size > 0) {
+            this._heldKeys.forEach(action => {
+                this._tryTransition(ConditionType.OnInputHeld, action);
+            });
+        }
+
         if (this._pendingReleases.length > 0) {
             for (const action of this._pendingReleases) {
                 // 方向键松开时，若还有方向键被按住则不停止，改为触发对应 OnInput
@@ -140,8 +167,7 @@ export default class StateMachineComponent extends cc.Component {
                         continue;
                     }
                     // 仅剩上下键按住：维持当前移动状态，不触发停止
-                    if (this._heldKeys.has('Up')   || this._heldKeys.has('W') ||
-                        this._heldKeys.has('Down') || this._heldKeys.has('S')) {
+                    if (this._heldKeys.has('Up') || this._heldKeys.has('Down')) {
                         continue;
                     }
                 }
@@ -240,14 +266,17 @@ export default class StateMachineComponent extends cc.Component {
 
         this._pendingInputs.push(action);
 
-        // 预输入缓冲：仅记录技能键（非方向键）
+        // 技能键处理：预输入缓冲 + 组合键队列
         if (this._isSkillKey(action)) {
+            // 预输入缓冲
             if (this._preInputBuffer && this._preInputBuffer.action !== action) {
-                // 按下了不同技能键，清除预输入缓冲
                 this._preInputBuffer = null;
             }
             const currentFrame = this.animPlayer ? this.animPlayer.currentFrameIndex : 0;
             this._preInputBuffer = { action, pressedAtAnimFrame: currentFrame };
+
+            // 组合键：只要有修饰键被按住就入队，由 _tryTransition 负责精确检查
+            this._pendingCombos.push(action);
         }
     }
 
@@ -273,8 +302,7 @@ export default class StateMachineComponent extends cc.Component {
                 // update() 中检测到对向键仍按住，会补发 OnInput 对向键
             }
             // 上下键按住：维持移动状态，无需切换朝向
-            if (this._heldKeys.has('Up')   || this._heldKeys.has('W') ||
-                this._heldKeys.has('Down') || this._heldKeys.has('S')) {
+            if (this._heldKeys.has('Up') || this._heldKeys.has('Down')) {
                 return;
             }
         }
@@ -282,10 +310,9 @@ export default class StateMachineComponent extends cc.Component {
         this._pendingReleases.push(action);
 
         // 上下键松开：若无任何方向键按住且当前是移动状态，补发松键停止信号
-        if (action === 'Up' || action === 'Down' || action === 'W' || action === 'S') {
+        if (action === 'Up' || action === 'Down') {
             const hasAnyDir = this._heldKeys.has('Left') || this._heldKeys.has('Right') ||
-                              this._heldKeys.has('Up')   || this._heldKeys.has('Down')  ||
-                              this._heldKeys.has('W')    || this._heldKeys.has('S');
+                              this._heldKeys.has('Up')   || this._heldKeys.has('Down');
             if (!hasAnyDir) {
                 const cur = this._currentState;
                 if (cur.indexOf('Walk') !== -1 || cur.indexOf('Run') !== -1) {
@@ -296,7 +323,24 @@ export default class StateMachineComponent extends cc.Component {
     }
 
     private _onAnimFinished(_stateName: string) {
+        // OnInputHeld 优先：按住某键时若有匹配的 OnInputHeld 转换，则拦截 AnimFinish
+        // 典型场景：Attack03 动画结束时 X 仍按住 → 循环 Attack01 而非回 StandBattle
+        // _inAnimFinished=true 期间，canInterrupt=false 的 OnInputHeld 转换也允许触发
+        this._inAnimFinished = true;
+        if (this._heldKeys.size > 0) {
+            const stateBefore = this._currentState;
+            this._heldKeys.forEach(action => {
+                if (this._currentState === stateBefore) {
+                    this._tryTransition(ConditionType.OnInputHeld, action);
+                }
+            });
+            if (this._currentState !== stateBefore) {
+                this._inAnimFinished = false;
+                return;
+            }
+        }
         this._tryTransition(ConditionType.OnAnimFinish, null);
+        this._inAnimFinished = false;
     }
 
     /**
@@ -325,10 +369,32 @@ export default class StateMachineComponent extends cc.Component {
                 if (t.conditionType !== conditionType) continue;
                 if ((conditionType === ConditionType.OnInput ||
                      conditionType === ConditionType.OnInputRelease ||
-                     conditionType === ConditionType.OnDoubleTap) &&
+                     conditionType === ConditionType.OnDoubleTap ||
+                     conditionType === ConditionType.OnCombo ||
+                     conditionType === ConditionType.OnInputHeld) &&
                     t.inputAction !== inputAction) continue;
+                // OnCombo 额外校验：修饰键格式 "A,B|C" = A 且 (B 或 C)
+                // 逗号分组 = AND，竖线分组 = OR
+                // 例："Down|S" = 按下箭头下或S键均可；"Down|S,Left|A" = 同时按住下/S 且 左/A
+                if (conditionType === ConditionType.OnCombo) {
+                    const mods = t.comboModifiers;
+                    if (!mods) continue;
+                    const groups = mods.split(',');
+                    let allGroupsMet = true;
+                    for (let gi = 0; gi < groups.length; gi++) {
+                        const options = groups[gi].split('|');
+                        let anyHeld = false;
+                        for (let oi = 0; oi < options.length; oi++) {
+                            const m = options[oi].trim();
+                            if (!m || this._heldKeys.has(m)) { anyHeld = true; break; }
+                        }
+                        if (!anyHeld) { allGroupsMet = false; break; }
+                    }
+                    if (!allGroupsMet) continue;
+                }
                 // canInsert=true 的转换可绕过 canInterrupt 检查，任意帧直接插入
-                if (!t.canInsert && !t.canInterrupt && conditionType !== ConditionType.OnAnimFinish) {
+                // _inAnimFinished=true 时表示动画刚结束，也允许 canInterrupt=false 的转换触发
+                if (!t.canInsert && !t.canInterrupt && conditionType !== ConditionType.OnAnimFinish && !this._inAnimFinished) {
                     const animState = this._animStateMap.get(this._currentState);
                     if (animState && !animState.loop && this.animPlayer) continue;
                 }
@@ -340,7 +406,9 @@ export default class StateMachineComponent extends cc.Component {
         }
 
         if (best) {
+            this._activeTransitionAction = inputAction;
             this._enterState(best.toState);
+            this._activeTransitionAction = null;
         }
     }
 
@@ -417,8 +485,14 @@ export default class StateMachineComponent extends cc.Component {
         // Immediate 未触发切换时，补发当前仍按住的方向键
         // 确保技能/攻击结束回到待机状态时，若方向键仍按住能立即恢复移动
         if (this._currentState === stateName) {
-            const dirKeys = ['Left', 'Right', 'Up', 'Down', 'W', 'S'];
+            const triggerIsHoriz = this._activeTransitionAction === 'Left' || this._activeTransitionAction === 'Right';
+            const dirKeys = ['Left', 'Right', 'Up', 'Down'];
             for (const dir of dirKeys) {
+                // 跳过触发当前转换的方向键，避免双击进入 Run 后立刻被该键的 OnInput 打回 Walk
+                if (dir === this._activeTransitionAction) continue;
+                // 若触发键是水平方向键，也跳过另一个水平方向键
+                // （双击换向时，对向键仍按住不应把新方向的 Run 打回 Walk）
+                if (triggerIsHoriz && (dir === 'Left' || dir === 'Right')) continue;
                 if (this._heldKeys.has(dir)) {
                     this._tryTransition(ConditionType.OnInput, dir);
                     // 已发生状态切换，由新状态的 _enterState 继续处理
@@ -440,8 +514,7 @@ export default class StateMachineComponent extends cc.Component {
      */
     private _isSkillKey(action: string): boolean {
         return action !== 'Left' && action !== 'Right' &&
-               action !== 'Up'  && action !== 'Down'  &&
-               action !== 'W'   && action !== 'S';
+               action !== 'Up'  && action !== 'Down';
     }
 
     /**
@@ -473,7 +546,8 @@ export default class StateMachineComponent extends cc.Component {
         let hasValidWindow = false;
         for (const list of lists) {
             for (const t of list) {
-                if (t.conditionType === ConditionType.OnInput &&
+                if ((t.conditionType === ConditionType.OnInput ||
+                     t.conditionType === ConditionType.OnCombo) &&
                     t.inputAction === action &&
                     t.preInputFrames > 0 &&
                     animFrameDiff <= t.preInputFrames) {
@@ -489,8 +563,12 @@ export default class StateMachineComponent extends cc.Component {
             return;
         }
 
-        // 尝试触发缓冲的输入；若转换成功，_enterState 会清除 _preInputBuffer
-        this._tryTransition(ConditionType.OnInput, action);
+        // 先尝试组合键（优先级高），再尝试普通输入；成功后 _enterState 会清除缓冲
+        const stateBefore = this._currentState;
+        this._tryTransition(ConditionType.OnCombo, action);
+        if (this._currentState === stateBefore) {
+            this._tryTransition(ConditionType.OnInput, action);
+        }
     }
 
     // ── 公共接口 ─────────────────────────────────────────────

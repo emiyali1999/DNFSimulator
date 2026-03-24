@@ -56,6 +56,8 @@ export default class PlayerController extends cc.Component {
 
     /** 跳跃竖向速度 */
     private _velY: number = 0;
+    /** 水平发射速度（由 launchHorizSpeed 驱动，不依赖方向键） */
+    private _velX: number = 0;
     private _isOnGround: boolean = true;
 
     /** 方向输入：x = 左右，y = 深度（上下键） */
@@ -87,6 +89,7 @@ export default class PlayerController extends cc.Component {
 
     update(dt: number) {
         this._updateMovement(dt);
+        this._updateLaunchVelocity(dt);
         this._updateJump(dt);
         this._applyProjection();
     }
@@ -123,6 +126,12 @@ export default class PlayerController extends cc.Component {
         if (this._moveDir.y !== 0 && vertScale !== 0) {
             this._worldZ += this._moveDir.y * speed * vertScale * dt;
         }
+    }
+
+    /** 应用水平发射速度（后跳等技能的自动位移，不依赖方向键） */
+    private _updateLaunchVelocity(dt: number) {
+        if (this._velX === 0) return;
+        this._worldX += this._velX * dt;
     }
 
     private _updateJump(dt: number) {
@@ -163,8 +172,16 @@ export default class PlayerController extends cc.Component {
     }
 
     private _onStateChanged(data: { from: string; to: string }) {
+        const animState = this.stateMachine ? this.stateMachine.getAnimState(data.to) : null;
+
+        // 水平发射速度（后跳等）：每次状态切换都更新，新状态无 launchHorizSpeed 则清零
+        const launchSpeed = animState ? animState.launchHorizSpeed : 0;
+        const scaleX = this.stateMachine ? this.stateMachine.node.scaleX : 1;
+        const facingDir = scaleX >= 0 ? 1 : -1;
+        this._velX = launchSpeed * facingDir;
+
+        // 跳跃
         if (data.to.indexOf("Jump") !== -1 && this._isOnGround) {
-            const animState = this.stateMachine ? this.stateMachine.getAnimState(data.to) : null;
             const jumpSpeed = animState ? animState.jumpSpeed : 0;
             if (jumpSpeed <= 0) return;
 
@@ -189,14 +206,10 @@ export default class PlayerController extends cc.Component {
         this._heldKeys.add(event.keyCode);
         const k = cc.macro.KEY;
         switch (event.keyCode) {
-            case k.up:
-            case k.w:     this._moveDir.y =  1; break;
-            case k.down:
-            case k.s:     this._moveDir.y = -1; break;
-            case k.left:
-            case k.a:     this._moveDir.x = -1; break;
-            case k.right:
-            case k.d:     this._moveDir.x =  1; break;
+            case k.up:    this._moveDir.y =  1; break;
+            case k.down:  this._moveDir.y = -1; break;
+            case k.left:  this._moveDir.x = -1; break;
+            case k.right: this._moveDir.x =  1; break;
         }
     }
 
@@ -205,24 +218,20 @@ export default class PlayerController extends cc.Component {
         const k = cc.macro.KEY;
         switch (event.keyCode) {
             case k.up:
-            case k.w:
                 if (this._moveDir.y > 0)
-                    this._moveDir.y = (this._heldKeys.has(k.down) || this._heldKeys.has(k.s)) ? -1 : 0;
+                    this._moveDir.y = this._heldKeys.has(k.down) ? -1 : 0;
                 break;
             case k.down:
-            case k.s:
                 if (this._moveDir.y < 0)
-                    this._moveDir.y = (this._heldKeys.has(k.up) || this._heldKeys.has(k.w)) ? 1 : 0;
+                    this._moveDir.y = this._heldKeys.has(k.up) ? 1 : 0;
                 break;
             case k.left:
-            case k.a:
                 if (this._moveDir.x < 0)
-                    this._moveDir.x = (this._heldKeys.has(k.right) || this._heldKeys.has(k.d)) ? 1 : 0;
+                    this._moveDir.x = this._heldKeys.has(k.right) ? 1 : 0;
                 break;
             case k.right:
-            case k.d:
                 if (this._moveDir.x > 0)
-                    this._moveDir.x = (this._heldKeys.has(k.left) || this._heldKeys.has(k.a)) ? -1 : 0;
+                    this._moveDir.x = this._heldKeys.has(k.left) ? -1 : 0;
                 break;
         }
     }

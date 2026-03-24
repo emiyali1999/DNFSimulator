@@ -104,6 +104,15 @@ export default class SpriteAnimState extends cc.Component {
     @property
     onlyFacingDir: boolean = true;
 
+    /**
+     * 进入此状态时自动施加的水平速度（相对朝向，负值=向后）
+     * 0 = 不自动水平移动（默认）
+     * 例：-250 表示以 250 单位/秒的速度向角色背后飞出（后跳效果）
+     * 此速度独立于方向键输入，持续到落地或被新状态覆盖
+     */
+    @property
+    launchHorizSpeed: number = 0;
+
     // ── 运行时缓存 ────────────────────────────────────────────
     private _frames: cc.SpriteFrame[] = null;
 

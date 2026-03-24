@@ -24,6 +24,20 @@ export enum ConditionType {
     OnInputRelease = 3,
     /** 在时间窗口内连按两次同一动作时触发 */
     OnDoubleTap = 4,
+    /**
+     * 持续按住某键时触发（自动连招）
+     * 每帧检查 inputAction 是否仍在按住状态，配合 minFrame/maxFrame 控制触发窗口
+     * 典型用法：Attack01→Attack02 配置 OnInputHeld X + minFrame=5，
+     * 按住 X 时动画播到第5帧自动衔接下一段攻击
+     */
+    OnInputHeld = 6,
+    /**
+     * 组合键触发（手搓招式）
+     * 按下 inputAction 键的同时，comboModifiers 中所有键均处于按住状态时触发
+     * 优先级高于同帧的 OnInput，触发后消费对应的 OnInput 事件
+     * 示例：inputAction="C", comboModifiers="Down" → 按住下键时按C触发
+     */
+    OnCombo = 5,
 }
 
 /** 参数比较运算符 */
@@ -116,8 +130,19 @@ export class OutgoingTransition {
     maxFrame: number = -1;
 
     /**
+     * 组合键修饰键，ConditionType.OnCombo 时生效
+     * 语法：逗号(,) = AND，竖线(|) = OR
+     *   "Down"       → 按住下箭头
+     *   "Down|S"     → 按住下箭头 或 S 键（同一组键位的双键支持）
+     *   "Down|S,A"   → (Down 或 S) 且 A 都要按住
+     * 键名与 InputAction.ts 中的动作名一致（Left/Right/Up/Down/W/S/X/Z/C/…）
+     */
+    @property
+    comboModifiers: string = "";
+
+    /**
      * 预输入缓冲帧数（动画帧，0 = 关闭预输入）
-     * 仅对 conditionType = OnInput 的转换生效。
+     * 对 conditionType = OnInput 和 OnCombo 的转换均生效。
      * 按下对应技能键后，若 minFrame 尚未到达，系统会保留该输入最多 preInputFrames 个动画帧；
      * 期间一旦 minFrame 开放则自动触发此转换。
      * 按下其他技能键会立即清除预输入缓冲。

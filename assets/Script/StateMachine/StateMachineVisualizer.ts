@@ -158,14 +158,14 @@ export default class StateMachineVisualizer extends cc.Component {
             const col = cc.color(255, 220, 80, 200);
             this._drawArrow(g, fp.x, fp.y, tp.x, tp.y, this._curRadius, this._nextRadius, col, dashed);
 
-            // 条件标签（显示在箭头中点）
+            // 条件标签（显示在箭头中点上方，避免与节点重叠）
             const label = this._conditionLabel(item.transition, item.isGlobal);
             if (label) {
                 this._addLabel(
-                    (fp.x + tp.x) / 2 + 4,
-                    (fp.y + tp.y) / 2 + 6,
+                    (fp.x + tp.x) / 2,
+                    (fp.y + tp.y) / 2 + 9,
                     label,
-                    Math.max(8, Math.round(this._nextRadius * 0.48)),
+                    Math.max(7, Math.round(this._nextRadius * 0.44)),
                     cc.color(255, 240, 120, 230)
                 );
             }
@@ -201,11 +201,14 @@ export default class StateMachineVisualizer extends cc.Component {
                 isHot ? cc.color(120, 220, 80, 220) : cc.color(140, 160, 230, 200),
                 false
             );
+            // 状态名显示在节点圆圈右侧，左对齐，避免与圆圈重叠
             this._addLabel(
-                item.pos.x, item.pos.y,
+                item.pos.x + this._nextRadius + 5,
+                item.pos.y,
                 item.state,
                 Math.max(8, Math.round(this._nextRadius * 0.52)),
-                isHot ? cc.color(180, 255, 120, 255) : cc.color(200, 210, 255, 230)
+                isHot ? cc.color(180, 255, 120, 255) : cc.color(200, 210, 255, 230),
+                cc.Label.HorizontalAlign.LEFT
             );
         }
 
@@ -268,49 +271,28 @@ export default class StateMachineVisualizer extends cc.Component {
             }
         }
         const targets = Object.keys(bestMap);
-
-        // 当前状态放在区域中心偏左（为右侧扇形留空间）
         const N = targets.length;
-        let curX = 0;
-        let curY = 0;
 
+        // 当前状态：左侧偏中
+        const curPos: Pos = { x: N > 0 ? -availW * 0.26 : 0, y: 0 };
+
+        // 下一状态：右侧竖向列表，行高自适应，保证节点不重叠
+        const outgoing: Array<{ state: string; pos: Pos; transition: OutgoingTransition; isGlobal: boolean }> = [];
         if (N > 0) {
-            // 当前状态偏左，留出右侧扇形空间
-            curX = -availW * 0.22;
-        }
-        const curPos: Pos = { x: curX, y: curY };
-
-        // 辐射半径：以当前节点为圆心，向右半平面展开
-        const radialR = Math.min(availW * 0.38, availH * 0.38);
-
-        // N 个目标：在右半圆 [-75°, +75°] 扇形内均匀分布
-        // 若 N == 1，直接放右侧
-        const outgoing: Array<{ state: string; pos: Pos; transition: TransitionConfig }> = [];
-
-        if (N === 1) {
-            outgoing.push({
-                state: targets[0],
-                pos:   { x: curX + radialR, y: curY },
-                transition: bestMap[targets[0]],
-                isGlobal: isGlobalMap[targets[0]],
-            });
-        } else if (N > 1) {
-            const halfSpan = Math.min(Math.PI * 0.75, Math.PI * (N - 1) / N);
+            const rightX = availW * 0.18;
+            const rowH = Math.min(56, (availH * 0.85) / N);
+            const startY = rowH * (N - 1) / 2;
             for (let i = 0; i < N; i++) {
-                const angle = -halfSpan + (2 * halfSpan / (N - 1)) * i;
                 outgoing.push({
                     state: targets[i],
-                    pos: {
-                        x: curX + radialR * Math.cos(angle),
-                        y: curY + radialR * Math.sin(angle),
-                    },
+                    pos: { x: rightX, y: startY - i * rowH },
                     transition: bestMap[targets[i]],
                     isGlobal: isGlobalMap[targets[i]],
                 });
             }
         }
 
-        // 上一状态：左上角固定位置（如果不是 currentState 且有记录）
+        // 上一状态：左上角固定位置
         let prevPos: Pos = null;
         if (this._prevState && this._prevState !== this._currentState) {
             prevPos = {
@@ -406,18 +388,25 @@ export default class StateMachineVisualizer extends cc.Component {
 
     private _conditionLabel(t: OutgoingTransition, isGlobal: boolean): string {
         const prefix = isGlobal ? "[*]" : "";
-        if (t.conditionType === ConditionType.OnInput)       return prefix + (t.inputAction || "Input");
-        if (t.conditionType === ConditionType.OnAnimFinish)  return prefix + "Finish";
-        if (t.conditionType === ConditionType.Immediate)     return prefix + "Auto";
+        if (t.conditionType === ConditionType.OnInput)        return prefix + (t.inputAction || "Input");
+        if (t.conditionType === ConditionType.OnAnimFinish)   return prefix + "Finish";
+        if (t.conditionType === ConditionType.Immediate)      return prefix + "Auto";
+        if (t.conditionType === ConditionType.OnInputRelease) return prefix + "↑" + (t.inputAction || "");
+        if (t.conditionType === ConditionType.OnDoubleTap)    return prefix + "×2" + (t.inputAction || "");
+        if (t.conditionType === ConditionType.OnCombo)        return prefix + (t.comboModifiers || "") + "+" + (t.inputAction || "");
+        if (t.conditionType === ConditionType.OnInputHeld)   return prefix + "[H]" + (t.inputAction || "");
         return prefix;
     }
 
-    private _addLabel(x: number, y: number, text: string, fontSize: number, color: cc.Color) {
+    private _addLabel(
+        x: number, y: number, text: string, fontSize: number, color: cc.Color,
+        halign: cc.Label.HorizontalAlign = cc.Label.HorizontalAlign.CENTER
+    ) {
         const n = new cc.Node();
         const l = n.addComponent(cc.Label);
         l.string = text;
         l.fontSize = fontSize;
-        l.horizontalAlign = cc.Label.HorizontalAlign.CENTER;
+        l.horizontalAlign = halign;
         l.verticalAlign   = cc.Label.VerticalAlign.CENTER;
         n.color = color;
         n.setPosition(x, y);

@@ -7,10 +7,6 @@ export const KEY_ACTION_MAP: { [keyCode: number]: string } = {};
 
 /** 在 cc 环境就绪后调用一次，初始化按键映射 */
 export function initKeyMap() {
-    KEY_ACTION_MAP[cc.macro.KEY.a]     = "A";
-    KEY_ACTION_MAP[cc.macro.KEY.d]     = "D";
-    KEY_ACTION_MAP[cc.macro.KEY.w]     = "W";
-    KEY_ACTION_MAP[cc.macro.KEY.s]     = "S";
     KEY_ACTION_MAP[cc.macro.KEY.left]  = "Left";
     KEY_ACTION_MAP[cc.macro.KEY.right] = "Right";
     KEY_ACTION_MAP[cc.macro.KEY.up]    = "Up";
