@@ -113,6 +113,10 @@
     ],
     "fps": 10,
     "loop": false,
+    "horizMoveScale": 1,
+    "vertMoveScale": 1,
+    "jumpSpeed": 600,
+    "onlyFacingDir": false,
     "_id": ""
   },
   {

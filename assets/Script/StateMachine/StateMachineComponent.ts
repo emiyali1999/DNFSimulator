@@ -46,6 +46,8 @@ export default class StateMachineComponent extends cc.Component {
     private readonly _DOUBLE_TAP_WINDOW = 0.3;
     /** 当前正在按住的动作集合，用于防止松键时对手方向还在按导致误触发 */
     private _heldKeys: Set<string> = new Set();
+    /** 最后按下的横向方向：1 = 右，-1 = 左，0 = 未按过 */
+    private _lastHorizDir: number = 0;
 
     // ── 生命周期 ─────────────────────────────────────────────
     onLoad() {
@@ -93,8 +95,15 @@ export default class StateMachineComponent extends cc.Component {
 
         // 双击优先处理，避免被单击覆盖
         if (this._pendingDoubleTaps.length > 0) {
+            const doubleTapSet = new Set(this._pendingDoubleTaps);
+            const stateBefore = this._currentState;
             for (const action of this._pendingDoubleTaps) {
                 this._tryTransition(ConditionType.OnDoubleTap, action);
+            }
+            // 只有双击真正触发了状态切换时才消费对应的 OnInput
+            // 若状态未变（如当前状态无匹配的 DoubleTap 转换），保留 OnInput 让连招正常触发
+            if (this._currentState !== stateBefore) {
+                this._pendingInputs = this._pendingInputs.filter(a => !doubleTapSet.has(a));
             }
             this._pendingDoubleTaps.length = 0;
         }
@@ -193,11 +202,21 @@ export default class StateMachineComponent extends cc.Component {
         const action = KEY_ACTION_MAP[event.keyCode];
         if (!action) return;
 
+        // 过滤 OS 按键重复事件：已在按住集合中说明是 key-repeat，跳过
+        if (this._heldKeys.has(action)) return;
+
         this._heldKeys.add(action);
 
-        // 左右键翻转朝向（默认图片朝右）
-        if (action === 'Left')  this.node.scaleX = -Math.abs(this.node.scaleX);
-        if (action === 'Right') this.node.scaleX =  Math.abs(this.node.scaleX);
+        // 记录最后按下的横向方向
+        if (action === 'Left')  this._lastHorizDir = -1;
+        if (action === 'Right') this._lastHorizDir =  1;
+
+        // 左右键翻转朝向（lockFacing 状态期间跳过翻转）
+        if ((action === 'Left' || action === 'Right') && !this._isCurrentStateLockFacing()) {
+            this.node.scaleX = action === 'Left'
+                ? -Math.abs(this.node.scaleX)
+                :  Math.abs(this.node.scaleX);
+        }
 
         // 双击检测：窗口内再次按下同一键则记为双击
         const now = Date.now() / 1000;
@@ -222,11 +241,16 @@ export default class StateMachineComponent extends cc.Component {
         if (action === 'Left' || action === 'Right') {
             const otherDir = action === 'Left' ? 'Right' : 'Left';
             if (this._heldKeys.has(otherDir)) {
-                // 对向水平键按住：切换朝向
-                this.node.scaleX = otherDir === 'Right'
-                    ? Math.abs(this.node.scaleX)
-                    : -Math.abs(this.node.scaleX);
-                return;
+                // 对向水平键按住：若未锁定朝向则切换 scaleX，并同步更新 _lastHorizDir
+                // 使后续 _enterState 的朝向对齐以新方向为准
+                if (!this._isCurrentStateLockFacing()) {
+                    this.node.scaleX = otherDir === 'Right'
+                        ? Math.abs(this.node.scaleX)
+                        : -Math.abs(this.node.scaleX);
+                    this._lastHorizDir = otherDir === 'Right' ? 1 : -1;
+                }
+                // 不 return，继续推入 _pendingReleases
+                // update() 中检测到对向键仍按住，会补发 OnInput 对向键
             }
             // 上下键按住：维持移动状态，无需切换朝向
             if (this._heldKeys.has('Up')   || this._heldKeys.has('W') ||
@@ -236,6 +260,19 @@ export default class StateMachineComponent extends cc.Component {
         }
 
         this._pendingReleases.push(action);
+
+        // 上下键松开：若无任何方向键按住且当前是移动状态，补发松键停止信号
+        if (action === 'Up' || action === 'Down' || action === 'W' || action === 'S') {
+            const hasAnyDir = this._heldKeys.has('Left') || this._heldKeys.has('Right') ||
+                              this._heldKeys.has('Up')   || this._heldKeys.has('Down')  ||
+                              this._heldKeys.has('W')    || this._heldKeys.has('S');
+            if (!hasAnyDir) {
+                const cur = this._currentState;
+                if (cur.indexOf('Walk') !== -1 || cur.indexOf('Run') !== -1) {
+                    this._pendingReleases.push('Left');
+                }
+            }
+        }
     }
 
     private _onAnimFinished(_stateName: string) {
@@ -337,12 +374,26 @@ export default class StateMachineComponent extends cc.Component {
             cc.warn(`[StateMachineComponent] 动画状态未找到: "${stateName}"，请检查 animStatesFolder 或 stateName 配置`);
         }
 
+        // 切换状态时，若新状态允许且有横向键按住，则对齐朝向（以最后按下的方向为准）
+        const allowAlign = animState ? animState.alignFacingOnEnter : true;
+        if (allowAlign && this._lastHorizDir !== 0 &&
+            (this._heldKeys.has('Left') || this._heldKeys.has('Right'))) {
+            this.node.scaleX = this._lastHorizDir < 0
+                ? -Math.abs(this.node.scaleX)
+                :  Math.abs(this.node.scaleX);
+        }
+
         // 发出状态变化事件，供 Visualizer 等监听
         this.node.emit("state-changed", { from: prevState, to: stateName });
         cc.log(`[StateMachineComponent] ${prevState || "(init)"} → ${stateName}`);
 
         // 检查进入新状态后是否有 Immediate 转换
         this._tryTransition(ConditionType.Immediate, null);
+    }
+
+    private _isCurrentStateLockFacing(): boolean {
+        const animState = this._animStateMap.get(this._currentState);
+        return animState ? animState.lockFacing : false;
     }
 
     // ── 公共接口 ─────────────────────────────────────────────
@@ -363,12 +414,20 @@ export default class StateMachineComponent extends cc.Component {
     }
 
     /**
-     * 手动触发输入动作（供 AI 或其他外部系统调用）
-     * @param action InputAction 枚举值或其字符串名称
+     * 手动触发输入动作（队列方式，下一帧处理）
      */
     triggerInput(action: string) {
         if (this._loaded) {
             this._pendingInputs.push(action);
+        }
+    }
+
+    /**
+     * 立即（同帧）触发输入动作，用于落地等需要即时响应的场景
+     */
+    triggerInputImmediate(action: string) {
+        if (this._loaded) {
+            this._tryTransition(ConditionType.OnInput, action);
         }
     }
 

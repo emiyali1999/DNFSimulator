@@ -55,6 +55,55 @@ export default class SpriteAnimState extends cc.Component {
     @property
     loop: boolean = true;
 
+    /**
+     * 水平（左右）移动系数
+     * 0 = 不可移动，1 = 正常速度，0.5 = 半速，以此类推
+     */
+    @property
+    horizMoveScale: number = 0;
+
+    /**
+     * 垂直（上下/深度）移动系数
+     * 0 = 不可移动，1 = 正常速度
+     */
+    @property
+    vertMoveScale: number = 0;
+
+    /**
+     * 跳跃初速度（世界单位/秒），仅跳跃状态有效，0 表示非跳跃状态
+     */
+    @property
+    jumpSpeed: number = 0;
+
+    /**
+     * 允许移动的帧索引列表（从 0 开始）
+     * 空数组 = 所有帧均可移动（默认）
+     * 例如 [0] = 只有第一帧可以移动
+     */
+    @property([Number])
+    moveFrames: number[] = [];
+
+    /**
+     * 此状态期间锁定朝向，不允许通过按键翻转角色面朝方向
+     */
+    @property
+    lockFacing: boolean = false;
+
+    /**
+     * 进入此状态时，是否根据当前按键对齐朝向
+     * 默认 true；Attack02/03 等连招状态设为 false，保持攻击方向不变
+     */
+    @property
+    alignFacingOnEnter: boolean = true;
+
+    /**
+     * 是否只允许往面朝方向移动（左右轴）
+     * true（默认）：按与朝向相反的方向键时不产生水平位移
+     * false：左右均可自由移动，如跳跃状态
+     */
+    @property
+    onlyFacingDir: boolean = true;
+
     // ── 运行时缓存 ────────────────────────────────────────────
     private _frames: cc.SpriteFrame[] = null;
 

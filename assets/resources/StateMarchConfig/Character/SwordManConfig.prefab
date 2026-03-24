@@ -236,6 +236,18 @@
     "stateName": "SwordMan_Run",
     "transitions": [
       {
+        "__id__": 37
+      },
+      {
+        "__id__": 38
+      },
+      {
+        "__id__": 24
+      },
+      {
+        "__id__": 25
+      },
+      {
         "__id__": 28
       },
       {
@@ -243,6 +255,9 @@
       },
       {
         "__id__": 32
+      },
+      {
+        "__id__": 16
       }
     ]
   },
@@ -267,6 +282,18 @@
       },
       {
         "__id__": 25
+      },
+      {
+        "__id__": 33
+      },
+      {
+        "__id__": 34
+      },
+      {
+        "__id__": 35
+      },
+      {
+        "__id__": 36
       }
     ]
   },
@@ -324,6 +351,12 @@
     "stateName": "SwordMan_Walk",
     "transitions": [
       {
+        "__id__": 24
+      },
+      {
+        "__id__": 25
+      },
+      {
         "__id__": 28
       },
       {
@@ -337,6 +370,9 @@
       },
       {
         "__id__": 32
+      },
+      {
+        "__id__": 16
       }
     ]
   },
@@ -455,6 +491,72 @@
     "toState": "SwordMan_Jump",
     "conditionType": 0,
     "inputAction": "C",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Walk",
+    "conditionType": 0,
+    "inputAction": "Up",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Walk",
+    "conditionType": 0,
+    "inputAction": "Down",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Walk",
+    "conditionType": 0,
+    "inputAction": "W",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Walk",
+    "conditionType": 0,
+    "inputAction": "S",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Walk",
+    "conditionType": 0,
+    "inputAction": "Left",
+    "priority": 0,
+    "canInterrupt": true,
+    "minFrame": -1,
+    "maxFrame": -1,
+    "conditions": []
+  },
+  {
+    "__type__": "OutgoingTransition",
+    "toState": "SwordMan_Walk",
+    "conditionType": 0,
+    "inputAction": "Right",
     "priority": 0,
     "canInterrupt": true,
     "minFrame": -1,

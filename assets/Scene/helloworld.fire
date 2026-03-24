@@ -460,11 +460,9 @@
       "__id__": 8
     },
     "_enabled": true,
-    "walkSpeed": 300,
-    "runSpeed": 600,
+    "moveSpeed": 300,
     "speedScale": 1,
     "perspectiveRatio": 0.5,
-    "jumpSpeed": 600,
     "gravity": 1200,
     "stateMachine": {
       "__id__": 11

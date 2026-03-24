@@ -22,13 +22,9 @@ const { ccclass, property } = cc._decorator;
 export default class PlayerController extends cc.Component {
 
     // ── 移动属性 ─────────────────────────────────────────────
-    /** 行走速度（世界单位/秒） */
+    /** 基础移动速度（世界单位/秒），各状态的实际速度 = moveSpeed × 状态的 horizMoveScale/vertMoveScale */
     @property
-    walkSpeed: number = 100;
-
-    /** 奔跑速度（世界单位/秒） */
-    @property
-    runSpeed: number = 200;
+    moveSpeed: number = 300;
 
     /** 速度缩放系数，乘在最终速度上 */
     @property
@@ -44,10 +40,6 @@ export default class PlayerController extends cc.Component {
     perspectiveRatio: number = 0.5;
 
     // ── 跳跃属性 ─────────────────────────────────────────────
-    /** 跳跃初速度（世界单位/秒） */
-    @property
-    jumpSpeed: number = 600;
-
     /** 重力加速度（世界单位/秒²） */
     @property
     gravity: number = 1200;
@@ -65,8 +57,6 @@ export default class PlayerController extends cc.Component {
     /** 跳跃竖向速度 */
     private _velY: number = 0;
     private _isOnGround: boolean = true;
-    /** 跳跃前的状态名，落地时若有方向键按住则恢复此状态 */
-    private _preJumpState: string = "";
 
     /** 方向输入：x = 左右，y = 深度（上下键） */
     private _moveDir: cc.Vec2 = cc.v2(0, 0);
@@ -105,13 +95,34 @@ export default class PlayerController extends cc.Component {
 
     private _updateMovement(dt: number) {
         if (this._moveDir.x === 0 && this._moveDir.y === 0) return;
+        if (!this.stateMachine) return;
 
-        const state = this.stateMachine ? this.stateMachine.getCurrentState() : "";
-        const baseSpeed = state.indexOf("Run") !== -1 ? this.runSpeed : this.walkSpeed;
-        const speed = baseSpeed * this.speedScale;
+        const stateName = this.stateMachine.getCurrentState();
+        const animState = this.stateMachine.getAnimState(stateName);
+        const horizScale = animState ? animState.horizMoveScale : 0;
+        const vertScale  = animState ? animState.vertMoveScale  : 0;
+        if (horizScale === 0 && vertScale === 0) return;
 
-        this._worldX += this._moveDir.x * speed * dt;
-        this._worldZ += this._moveDir.y * speed * dt;   // 上下键 → 深度轴
+        // 帧限制检查：moveFrames 非空时，只有列出的帧可以移动
+        if (animState && animState.moveFrames.length > 0) {
+            const frame = this.stateMachine.animPlayer.currentFrameIndex;
+            if (animState.moveFrames.indexOf(frame) === -1) return;
+        }
+
+        const speed = this.moveSpeed * this.speedScale;
+
+        if (this._moveDir.x !== 0 && horizScale !== 0) {
+            // 若状态限制只能往面朝方向移动，则检查输入方向与 scaleX 是否一致
+            const onlyFacing = animState ? animState.onlyFacingDir : true;
+            const scaleX     = this.stateMachine ? this.stateMachine.node.scaleX : this.node.scaleX;
+            const facingDir  = scaleX >= 0 ? 1 : -1;
+            if (!onlyFacing || this._moveDir.x === facingDir) {
+                this._worldX += this._moveDir.x * speed * horizScale * dt;
+            }
+        }
+        if (this._moveDir.y !== 0 && vertScale !== 0) {
+            this._worldZ += this._moveDir.y * speed * vertScale * dt;
+        }
     }
 
     private _updateJump(dt: number) {
@@ -126,17 +137,14 @@ export default class PlayerController extends cc.Component {
             this._isOnGround = true;
             // 落地时：若跳前是 Walk/Run 且仍有方向键按住，恢复原状态；否则回 StandBattle
             if (this.stateMachine) {
+                this.stateMachine.forceChangeState("SwordMan_StandBattle");
+                // 落地后同帧补发仍按住的方向键，让状态机立刻切换到 Walk
                 const k = cc.macro.KEY;
-                const hasDir = this._heldKeys.has(k.left)  || this._heldKeys.has(k.a) ||
-                               this._heldKeys.has(k.right) || this._heldKeys.has(k.d) ||
-                               this._heldKeys.has(k.up)    || this._heldKeys.has(k.w) ||
-                               this._heldKeys.has(k.down)  || this._heldKeys.has(k.s);
-                const landing = (this._preJumpState && hasDir)
-                    ? this._preJumpState
-                    : "SwordMan_StandBattle";
-                this.stateMachine.forceChangeState(landing);
+                if (this._heldKeys.has(k.left)  || this._heldKeys.has(k.a))  this.stateMachine.triggerInputImmediate('Left');
+                if (this._heldKeys.has(k.right) || this._heldKeys.has(k.d))  this.stateMachine.triggerInputImmediate('Right');
+                if (this._heldKeys.has(k.up)    || this._heldKeys.has(k.w))  this.stateMachine.triggerInputImmediate('Up');
+                if (this._heldKeys.has(k.down)  || this._heldKeys.has(k.s))  this.stateMachine.triggerInputImmediate('Down');
             }
-            this._preJumpState = "";
         }
     }
 
@@ -156,12 +164,13 @@ export default class PlayerController extends cc.Component {
 
     private _onStateChanged(data: { from: string; to: string }) {
         if (data.to.indexOf("Jump") !== -1 && this._isOnGround) {
-            // 只记录 Walk/Run 状态，其他状态跳跃落地后回 StandBattle
-            this._preJumpState = (data.from.indexOf("Walk") !== -1 || data.from.indexOf("Run") !== -1)
-                ? data.from : "";
-            this._velY         = this.jumpSpeed;
+            const animState = this.stateMachine ? this.stateMachine.getAnimState(data.to) : null;
+            const jumpSpeed = animState ? animState.jumpSpeed : 0;
+            if (jumpSpeed <= 0) return;
+
+            this._velY         = jumpSpeed;
             this._isOnGround   = false;
-            this._syncJumpAnimFps(data.to);
+            this._syncJumpAnimFps(animState, jumpSpeed);
         }
     }
 
@@ -169,11 +178,10 @@ export default class PlayerController extends cc.Component {
      * 根据跳跃物理时长动态调整 Jump 动画的 fps，使动画最后一帧恰好在落地时播完
      * jumpDuration = 2 × jumpSpeed / gravity（上升 + 下降对称）
      */
-    private _syncJumpAnimFps(jumpStateName: string) {
+    private _syncJumpAnimFps(animState: import("../SpriteAnimState").default, jumpSpeed: number) {
         if (!this.stateMachine || !this.stateMachine.animPlayer) return;
-        const animState = this.stateMachine.getAnimState(jumpStateName);
         if (!animState || animState.frameCount <= 0) return;
-        const duration = 2 * this.jumpSpeed / this.gravity;
+        const duration = 2 * jumpSpeed / this.gravity;
         this.stateMachine.animPlayer.setFpsOverride(animState.frameCount / duration);
     }
 

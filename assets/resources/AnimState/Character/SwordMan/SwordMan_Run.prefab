@@ -113,6 +113,8 @@
     ],
     "fps": 10,
     "loop": true,
+    "horizMoveScale": 2,
+    "vertMoveScale": 2,
     "_id": ""
   },
   {
